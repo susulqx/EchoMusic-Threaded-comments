@@ -11,7 +11,7 @@
  *   src/meta-cache.js    /comment/* 响应 → 「昵称+时间」→ pid 关系缓存
  *   src/runtime.js       共享的响应式设置状态
  *   src/dom.js           宿主 DOM 读取与痕迹清理
- *   src/toggle.js        单条回复的折叠按钮
+ *   src/guides.js        引导线图层：主干、圆角分支、折叠节点（SVG）
  *   src/pager.js         楼层内分页条
  *   src/interactions.js  点击意图解析
  *   src/container.js     楼层容器的装配与重算

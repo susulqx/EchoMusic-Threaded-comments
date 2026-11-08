@@ -1,42 +1,117 @@
+/* 楼层容器是引导线图层的定位包含块 */
 .comment-floor-inline[data-echo-thread="on"] {
-  --echo-tree-line: var(--border-subtle, rgba(255, 255, 255, 0.14));
+  position: relative;
+  /*
+   * 线色取正文次要色的 28% 透明度：近中性的淡灰，落在任何主题底色上都不抢正文。
+   * 直接用边框色（--border-light）会过实，树看起来像表格线。
+   */
+  --echo-tree-line: color-mix(in srgb, var(--text-secondary, #9499a0) 28%, transparent);
+  /*
+   * 节点必须是**不透明**底色：圆环骑在主干竖线上，半透明会让竖线从减号里透出来。
+   * 取主面板底色 —— 楼层容器的背景是它的 5% 叠色，差异看不出来。
+   */
+  --echo-tree-node-bg: var(--surface-main-base, Canvas);
+}
+
+/*
+ * 缩进作用于整条回复（头像 + 正文一起右移），与线层叠加出层级。
+ * 用 padding 而不是 margin：线层覆盖容器的 padding box，padding 让正文宽度自然收窄。
+ */
+.comment-floor-inline[data-echo-thread="on"] > .comment-floor-reply[data-echo-tree] {
+  padding-inline-start: calc(var(--echo-tree-step, 32px) * var(--echo-tree-depth, 0));
+}
+
+/* 宿主在相邻回复之间画了分割线；树状后层级由引导线表达，分割线会横穿竖线 */
+.comment-floor-inline[data-echo-thread="on"]
+  > .comment-floor-reply[data-echo-tree]
+  + .comment-floor-reply[data-echo-tree] {
+  border-top: none;
+}
+
+/*
+ * 线层：绝对定位覆盖整个容器，不接收指针事件，点击只落到分支组上。
+ * 高度由 JS 按实际内容设定，宽度跟随容器。
+ */
+.echo-tree-guides {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 0;
+  overflow: visible;
+  pointer-events: none;
 }
 
 .comment-floor-inline[data-echo-thread="on"] > .comment-floor-reply[data-echo-tree] {
   position: relative;
-  margin-left: calc(var(--echo-tree-step, 32px) * var(--echo-tree-depth, 0));
+  z-index: 1;
 }
 
-.comment-floor-inline[data-echo-guides="on"]
-  > .comment-floor-reply[data-echo-tree-depth]:not([data-echo-tree-depth="0"])::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: calc(var(--echo-tree-step, 32px) * var(--echo-tree-depth, 0) * -1);
-  width: calc(var(--echo-tree-step, 32px) * var(--echo-tree-depth, 0));
-  background-image: repeating-linear-gradient(
-    to right,
-    var(--echo-tree-line) 0 1px,
-    transparent 1px var(--echo-tree-step, 32px)
-  );
+/* 分支组的点击区与键盘区由 transparent stroke 提供 */
+.echo-tree-branch {
+  pointer-events: auto;
+  cursor: pointer;
+  outline: none;
+}
+
+.echo-tree-branch-line {
+  fill: none;
+  stroke: var(--echo-tree-line);
+  stroke-width: 2px;
+  /* 线帽切成 butt，圆角线帽会在竖线两端鼓出一截 */
+  stroke-linecap: butt;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  transition: stroke 0.15s ease;
+}
+
+.echo-tree-branch-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 24px;
+  pointer-events: stroke;
+}
+
+.echo-tree-branch-node {
+  fill: var(--echo-tree-node-bg);
+  stroke: var(--echo-tree-line);
+  stroke-width: 2px;
+  transition: stroke 0.15s ease;
+}
+
+.echo-tree-branch-node-hit {
+  fill: transparent;
+  stroke: none;
+  pointer-events: all;
+}
+
+.echo-tree-branch-node-focus {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 2px;
   pointer-events: none;
 }
 
-.comment-floor-inline[data-echo-guides="on"]
-  > .comment-floor-reply[data-echo-tree-depth]:not([data-echo-tree-depth="0"])::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: calc(var(--echo-tree-step, 32px) * -1);
-  width: calc(var(--echo-tree-step, 32px) + 12px);
-  height: 31px;
-  border-left: 1px solid var(--echo-tree-line);
-  border-bottom: 1px solid var(--echo-tree-line);
-  border-bottom-left-radius: 10px;
-  pointer-events: none;
+.echo-tree-branch-symbol {
+  fill: none;
+  stroke: var(--echo-tree-line);
+  stroke-width: 2px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  transition: stroke 0.15s ease;
 }
 
+.echo-tree-branch:hover :is(.echo-tree-branch-line, .echo-tree-branch-node, .echo-tree-branch-symbol),
+.echo-tree-branch:focus-visible :is(.echo-tree-branch-line, .echo-tree-branch-node, .echo-tree-branch-symbol) {
+  stroke: var(--color-primary, #7cc6ff);
+}
+
+.echo-tree-branch:focus-visible .echo-tree-branch-node-focus {
+  stroke: var(--color-primary, #7cc6ff);
+}
+
+/* 折叠：子回复由 JS 隐藏；「收起主评论」模式再多压掉父回复本体 */
 .comment-floor-inline > .comment-floor-reply[data-echo-tree-hidden] {
   display: none !important;
 }
@@ -93,29 +168,6 @@
   font-size: 12px;
   color: var(--color-text-secondary, inherit);
   font-variant-numeric: tabular-nums;
-}
-
-.echo-tree-toggle {
-  flex: none;
-  margin-left: 6px;
-  min-width: 24px;
-  height: 18px;
-  padding: 0 6px;
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.16));
-  border-radius: 9px;
-  background: var(--control-muted-bg, transparent);
-  color: var(--color-text-secondary, inherit);
-  font-size: 11px;
-  line-height: 16px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.echo-tree-toggle:hover,
-.echo-tree-toggle:focus-visible {
-  border-color: var(--color-primary, #7cc6ff);
-  color: var(--color-primary, #7cc6ff);
-  outline: none;
 }
 
 .echo-tc-settings {

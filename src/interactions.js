@@ -6,9 +6,11 @@
  */
 
 import { findLoadMoreButton } from "./dom.js";
+import { BRANCH_CLASS } from "./guides.js";
 import { PAGER_BUTTON_SELECTOR, PAGER_PREV_CLASS } from "./pager.js";
 
-export const TOGGLE_SELECTOR = ".comment-floor-reply-header > .echo-tree-toggle";
+/** 折叠入口是引导线里的分支组；节点、符号、命中区都在组内，点哪个都归到这条分支 */
+export const TOGGLE_SELECTOR = "." + BRANCH_CLASS;
 
 const closestIn = (target, selector, scope) => {
   if (!target || typeof target.closest !== "function") return null;

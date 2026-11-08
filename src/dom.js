@@ -5,15 +5,19 @@
  * 所有选择器集中在这里与 constants.js 的注释里，宿主改版时只需改这两处。
  */
 
+import {
+  HEADER_CLASS,
+  MORE_BUTTON_CLASS,
+  MORE_CLASS,
+  NAME_CLASS,
+  REPLY_CLASS,
+  TIME_CLASS,
+} from "./constants.js";
+import { clearGuides } from "./guides.js";
 import { resolveMetaKey } from "./tree.js";
 import { directChild } from "./util.js";
 
-export const REPLY_CLASS = "comment-floor-reply";
-export const NAME_CLASS = "comment-floor-reply-name";
-export const TIME_CLASS = "comment-floor-reply-time";
-export const HEADER_CLASS = "comment-floor-reply-header";
-export const MORE_CLASS = "comment-floor-more";
-export const MORE_BUTTON_CLASS = "comment-floor-more-btn";
+
 
 export const isReplyElement = (element) =>
   Boolean(element && element.classList && element.classList.contains(REPLY_CLASS));
@@ -55,7 +59,6 @@ const REPLY_ATTRS = [
 const CONTAINER_ATTRS = [
   "data-echo-thread",
   "data-echo-mode",
-  "data-echo-guides",
   "data-echo-container",
 ];
 
@@ -72,9 +75,9 @@ export const clearContainerMarks = (container, releaseProtection) => {
   for (const element of readReplies(container)) {
     for (const attr of REPLY_ATTRS) element.removeAttribute(attr);
     element.style.removeProperty("--echo-tree-depth");
-    const toggle = element.querySelector(".echo-tree-toggle");
-    if (toggle) toggle.remove();
   }
+
+  clearGuides(container);
 
   const pager = directChild(container, "echo-tree-pager");
   if (pager) pager.remove();

@@ -19,9 +19,9 @@ import {
   protectKeys,
   releaseProtection,
 } from "./meta-cache.js";
+import { syncGuides } from "./guides.js";
 import { syncPager } from "./pager.js";
 import { getSettings } from "./runtime.js";
-import { syncToggle } from "./toggle.js";
 import { buildThreadTree, computeIndentStep, paginateTree } from "./tree.js";
 
 /** container -> state，容器断开后由 teardownContainer 移除 */
@@ -65,7 +65,6 @@ const collectItems = (keys) => {
 const applyContainerAttrs = (container, settings) => {
   container.setAttribute("data-echo-thread", "on");
   container.setAttribute("data-echo-mode", settings.mode);
-  container.setAttribute("data-echo-guides", settings.mode === "indentOnly" ? "off" : "on");
 
   if (settings.container) {
     container.setAttribute("data-echo-container", "on");
@@ -106,27 +105,16 @@ const computeHidden = (tree, state, pageById) => {
   return hiddenById;
 };
 
-const applyReply = (element, node, depth, hidden, settings, state) => {
+const applyReply = (element, depth, hidden, collapsed) => {
   element.setAttribute("data-echo-tree", "on");
   element.setAttribute("data-echo-tree-depth", String(depth));
   element.style.setProperty("--echo-tree-depth", String(depth));
 
-  if (node && node.hasChildren) {
-    const collapsed = state.collapsed.has(node.id);
-    element.setAttribute("data-echo-tree-branch", "on");
-    element.setAttribute("data-echo-tree-tail", "+" + node.descendantCount);
-    if (collapsed) element.setAttribute("data-echo-tree-collapsed", "on");
-    else element.removeAttribute("data-echo-tree-collapsed");
-  } else {
-    element.removeAttribute("data-echo-tree-branch");
-    element.removeAttribute("data-echo-tree-tail");
-    element.removeAttribute("data-echo-tree-collapsed");
-  }
+  if (collapsed) element.setAttribute("data-echo-tree-collapsed", "on");
+  else element.removeAttribute("data-echo-tree-collapsed");
 
   if (hidden) element.setAttribute("data-echo-tree-hidden", "on");
   else element.removeAttribute("data-echo-tree-hidden");
-
-  syncToggle(element, node, settings, Boolean(node && state.collapsed.has(node.id)));
 };
 
 /**
@@ -159,20 +147,33 @@ export const applyContainer = (container) => {
   const pageById = applyPaging(container, state, settings, tree);
   const hiddenById = computeHidden(tree, state, pageById);
 
+  const rows = [];
   replies.forEach((element, index) => {
     const key = keys[index];
+    // 同一楼层内同名同秒无法区分谁是谁，整组按根级平铺，不猜挂载
     const node = key && keyCount.get(key) === 1 ? nodeById.get(key) : undefined;
-    applyReply(
+    const depth = node ? node.depth : 0;
+    const hidden = Boolean(node && hiddenById.get(node.id) === true);
+    const collapsed = Boolean(node && state.collapsed.has(node.id));
+
+    applyReply(element, depth, hidden, collapsed);
+    // 隐藏的行不参与画线：它们没有可量的矩形，Guide 只认可见的锚点
+    if (!node || hidden) return;
+    rows.push({
       element,
-      node,
-      node ? node.depth : 0,
-      Boolean(node && hiddenById.get(node.id) === true),
-      settings,
-      state,
-    );
+      key,
+      depth,
+      parentKey: node.parentId || "",
+      hasChildren: node.hasChildren,
+      collapsed,
+    });
   });
 
+  syncGuides(container, rows, settings);
   syncPager(container, state, settings, pageById ? state.pageCount : 1);
+
+  // 引导线是我们自己写进容器的，别让容器观察器把它当成宿主的变更再算一遍
+  if (state.observer) state.observer.takeRecords();
 };
 
 /** 折叠集合按「昵称\0时间」记，跨加载更多稳定；集合自身必须有界 */

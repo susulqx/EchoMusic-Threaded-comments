@@ -53,13 +53,13 @@ test("压缩后的产物仍能激活，且注入的样式与源文件结构一�
   // 关键规则必须还在：缩进、隐藏、折叠、引导线、容器
   // 压缩会把 ": " 收紧成 ":"，这里按压缩后的形态断言
   for (const rule of [
-    "margin-left:calc(var(--echo-tree-step",
+    "padding-inline-start:calc(var(--echo-tree-step",
     "[data-echo-tree-hidden]",
     'data-echo-mode="lineCollapseMain"',
-    'data-echo-guides="on"',
     'data-echo-container="on"',
     ".echo-tree-pager-btn",
-    ".echo-tree-toggle",
+    ".echo-tree-guides",
+    ".echo-tree-branch-node",
   ]) {
     assert.ok(box.css.includes(rule), "缺少规则：" + rule);
   }

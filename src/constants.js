@@ -13,6 +13,19 @@
 
 export const STORAGE_KEY = "threaded-comments:settings";
 
+/**
+ * 宿主选择器。放在这里而不是 dom.js：guides.js 也要用，
+ * 而 dom.js 依赖 guides.js（清理图层），选择器若留在 dom.js 会形成循环依赖。
+ */
+export const REPLY_CLASS = "comment-floor-reply";
+export const NAME_CLASS = "comment-floor-reply-name";
+export const TIME_CLASS = "comment-floor-reply-time";
+export const HEADER_CLASS = "comment-floor-reply-header";
+export const AVATAR_CLASS = "comment-floor-reply-avatar";
+export const FOOTER_CLASS = "comment-floor-reply-footer";
+export const MORE_CLASS = "comment-floor-more";
+export const MORE_BUTTON_CLASS = "comment-floor-more-btn";
+
 export const DEFAULT_SETTINGS = {
   enabled: true,
   mode: "lineKeepMain",
@@ -39,8 +52,16 @@ export const MAX_COLLAPSED_KEYS = 400;
 /** 楼层内分页：每页的根回复数量 */
 export const ROOTS_PER_PAGE = 20;
 
-/** 缩进步长：窄容器 24px、宽容器 32px，拟合后不低于 19px */
-export const MIN_INDENT_STEP = 19;
+/**
+ * 缩进步长：窄容器 24px、宽容器 32px。
+ *
+ * 下限 = 头像半径 + 4px 间隙：再小的话子头像会压在父头像的竖线上，
+ * 分支没有水平空间可画，树看起来就是一列。宿主头像 30px 见 CommentList.vue 的
+ * .comment-floor-reply-avatar，改尺寸时同步这里。
+ */
+export const AVATAR_SIZE = 30;
+export const MIN_GUIDE_GAP = 4;
+export const MIN_INDENT_STEP = AVATAR_SIZE / 2 + MIN_GUIDE_GAP;
 export const NARROW_WIDTH = 640;
 export const NARROW_INDENT_STEP = 24;
 export const WIDE_INDENT_STEP = 32;
