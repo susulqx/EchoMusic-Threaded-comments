@@ -36,14 +36,51 @@ EchoMusic 插件。把歌曲 / 专辑 / 歌单评论里的楼层回复，按回�
 - 关系缓存有上限，且正在展示的楼层会被保护，不会被后续大量请求挤掉。
 - 插件禁用或卸载时，所有属性、注入的按钮与监听器都会被移除。
 
+## 二次开发
+
+源码在 `src/`，交付物 `index.js` 是打包产物（宿主通过 Blob URL 加载入口，入口里的相对 `import` 不会被解析，所以必须自包含单文件）。
+
+```bash
+node build.mjs              # 打包 + 压缩，生成 index.js
+node build.mjs --no-minify  # 只打包不压缩，便于对照排查
+node build.mjs --watch      # 改 src/ 后自动重建
+```
+
+依赖零成本：不引入 esbuild / rollup / 任何 npm 包，`build.mjs` 只做本项目用到的语法子集（静态相对 import、具名 export、export default）。
+
+压缩策略是**只删注释与空白，不重命名任何标识符**：产物里 `buildThreadTree`、`data-echo-tree-depth` 这类名字原样保留，线上排查照样能搜；同时不做任何会改变运行时的变换，性能与未压缩版一致（约 51 KB → 33 KB）。
+
+| 模块 | 职责 |
+| --- | --- |
+| `src/constants.js` | 常量、默认值、宿主选择器清单 |
+| `src/i18n.js` | **全部面向用户的文案**（含「上一页 / 下一页 / 加载更多」），带占位符替换与语言回落 |
+| `src/util.js` | 无副作用的小工具 |
+| `src/tree.js` | 回复树构建、分页切分、缩进步长（纯函数） |
+| `src/settings.js` | 设置规整与读取 |
+| `src/meta-cache.js` | `/comment/*` 响应 → 「昵称 + 时间」→ pid 的关系缓存 |
+| `src/runtime.js` | 共享的响应式设置状态 |
+| `src/dom.js` | 宿主 DOM 读取与痕迹清理 |
+| `src/toggle.js` | 单条回复的折叠按钮 |
+| `src/pager.js` | 楼层内分页条 |
+| `src/interactions.js` | 点击意图解析 |
+| `src/container.js` | 楼层容器的装配与重算 |
+| `src/settings-page.js` | 设置页组件 |
+| `src/styles.css` | 全部样式 |
+| `src/entry.js` | 入口：activate / deactivate 编排 |
+
+### 多语言化
+
+界面上不存在硬编码文案：所有字符串都在 `src/i18n.js` 的 `MESSAGES` 里按 locale 分组，组件只写 `t("key")`，占位符写成 `{name}`。新增语言时只加一个 locale 分组，缺失的键自动回落到中文。测试会扫描 `src/` 下除 `i18n.js` 以外的所有文件，出现中文字面量即失败。
+
 ## 测试
 
 ```bash
-node --test tests/threaded-comments.test.mjs tests/threaded-comments.dom.test.mjs
+node --test tests/threaded-comments.test.mjs tests/threaded-comments.dom.test.mjs tests/build.test.mjs
 ```
 
-- `threaded-comments.test.mjs`：纯函数（设置归一化、树构建断环 / 深度上限 / 同级排序、对齐键、缩进步长）。
+- `threaded-comments.test.mjs`：纯函数（设置归一化、树构建断环 / 深度上限 / 同级排序、对齐键、缩进步长）+ 文案与产物自包含。
 - `threaded-comments.dom.test.mjs`：用最小 DOM 桩驱动完整链路 —— 拦截器采集关系 → 楼层打标 → 折叠 → 分页切页 → 加载更多后保持折叠 → 关闭与卸载清理。
+- `build.test.mjs`：对**打包产物**跑一次真实 `activate`，校验注入的 CSS 结构完整、导出与拦截器契约不变、压缩未重命名标识符。
 
 ## 兼容性
 

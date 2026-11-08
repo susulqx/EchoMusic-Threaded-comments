@@ -1,0 +1,165 @@
+.comment-floor-inline[data-echo-thread="on"] {
+  --echo-tree-line: var(--border-subtle, rgba(255, 255, 255, 0.14));
+}
+
+.comment-floor-inline[data-echo-thread="on"] > .comment-floor-reply[data-echo-tree] {
+  position: relative;
+  margin-left: calc(var(--echo-tree-step, 32px) * var(--echo-tree-depth, 0));
+}
+
+.comment-floor-inline[data-echo-guides="on"]
+  > .comment-floor-reply[data-echo-tree-depth]:not([data-echo-tree-depth="0"])::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--echo-tree-step, 32px) * var(--echo-tree-depth, 0) * -1);
+  width: calc(var(--echo-tree-step, 32px) * var(--echo-tree-depth, 0));
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--echo-tree-line) 0 1px,
+    transparent 1px var(--echo-tree-step, 32px)
+  );
+  pointer-events: none;
+}
+
+.comment-floor-inline[data-echo-guides="on"]
+  > .comment-floor-reply[data-echo-tree-depth]:not([data-echo-tree-depth="0"])::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: calc(var(--echo-tree-step, 32px) * -1);
+  width: calc(var(--echo-tree-step, 32px) + 12px);
+  height: 31px;
+  border-left: 1px solid var(--echo-tree-line);
+  border-bottom: 1px solid var(--echo-tree-line);
+  border-bottom-left-radius: 10px;
+  pointer-events: none;
+}
+
+.comment-floor-inline > .comment-floor-reply[data-echo-tree-hidden] {
+  display: none !important;
+}
+
+.comment-floor-inline[data-echo-mode="lineCollapseMain"]
+  > .comment-floor-reply[data-echo-tree-collapsed]
+  .comment-floor-reply-body
+  > :not(.comment-floor-reply-header) {
+  display: none !important;
+}
+
+.comment-floor-inline[data-echo-container="on"] {
+  max-height: var(--echo-tree-container-height, 480px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.echo-tree-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 0 2px;
+}
+
+.echo-tree-pager-btn {
+  min-width: 64px;
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.16));
+  border-radius: var(--radius-pill, 13px);
+  background: var(--control-muted-bg, transparent);
+  color: var(--color-text-secondary, inherit);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.echo-tree-pager-btn:hover:not([disabled]),
+.echo-tree-pager-btn:focus-visible {
+  border-color: var(--color-primary, #7cc6ff);
+  color: var(--color-primary, #7cc6ff);
+  outline: none;
+}
+
+.echo-tree-pager-btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.echo-tree-pager-info {
+  font-size: 12px;
+  color: var(--color-text-secondary, inherit);
+  font-variant-numeric: tabular-nums;
+}
+
+.echo-tree-toggle {
+  flex: none;
+  margin-left: 6px;
+  min-width: 24px;
+  height: 18px;
+  padding: 0 6px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.16));
+  border-radius: 9px;
+  background: var(--control-muted-bg, transparent);
+  color: var(--color-text-secondary, inherit);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.echo-tree-toggle:hover,
+.echo-tree-toggle:focus-visible {
+  border-color: var(--color-primary, #7cc6ff);
+  color: var(--color-primary, #7cc6ff);
+  outline: none;
+}
+
+.echo-tc-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 0;
+}
+
+.echo-tc-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.echo-tc-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.echo-tc-label {
+  font-size: 13px;
+  color: var(--color-text-main, inherit);
+}
+
+.echo-tc-desc {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-text-secondary, inherit);
+}
+
+.echo-tc-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 160px;
+}
+
+.echo-tc-note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--color-text-secondary, inherit);
+}

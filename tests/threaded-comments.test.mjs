@@ -111,3 +111,52 @@ test("缩进步长随容器宽度收窄，但不低于头像半宽下限", () =>
   assert.equal(api.computeIndentStep(600, 2), 24);
   assert.equal(api.computeIndentStep(300, 10), 19);
 });
+
+/* ------------------------------------------------------------------ *
+ * 多语言：文案只在 i18n.js 里，其它模块一律走 t()
+ * ------------------------------------------------------------------ */
+
+test("文案默认输出中文，并支持占位符", () => {
+  assert.equal(api.t("pager.prev"), "上一页");
+  assert.equal(api.t("pager.next"), "下一页");
+  assert.equal(api.t("pager.loadMore"), "加载更多");
+  assert.equal(api.t("pager.info", { page: 2, total: 5 }), "第 2 / 5 页");
+  assert.equal(
+    api.t("settings.containerHeight.desc", { min: 240, max: 960 }),
+    "240–960 像素。",
+  );
+});
+
+test("未知键原样返回，便于开发期发现遗漏", () => {
+  assert.equal(api.t("nope.missing"), "nope.missing");
+});
+
+test("未知语言回落到中文", () => {
+  api.setLocale("xx-YY");
+  assert.equal(api.t("pager.prev"), "上一页");
+  api.setLocale("zh-Hans");
+  assert.equal(api.t("pager.prev"), "上一页");
+});
+
+test("界面文案都登记在 i18n 里，其它模块无中文字面量", async () => {
+  const { readdir } = await import("node:fs/promises");
+  const dir = new URL("../src/", import.meta.url);
+  const files = (await readdir(dir)).filter(
+    (name) => name.endsWith(".js") && name !== "i18n.js",
+  );
+  const offenders = [];
+  for (const name of files) {
+    const raw = await readFile(new URL(name, dir), "utf8");
+    // 去掉块注释与行注释后，剩下的才是真正会进入运行时的字符串
+    const code = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const hits = code.match(/["'`][^"'`]*[\u4e00-\u9fa5][^"'`]*["'`]/g);
+    if (hits) offenders.push(name + " -> " + hits.join(" | "));
+  }
+  assert.deepEqual(offenders, []);
+});
+
+test("打包产物自包含：无相对 import，可直接经 Blob URL 加载", () => {
+  assert.doesNotMatch(source, /^\s*import\s[^;]*from\s*["']\./m);
+  assert.doesNotMatch(source, /from\s*["'][^"']*\.css["']/);
+  assert.match(source, /由 build\.mjs 从 src\/ 打包生成/);
+});
