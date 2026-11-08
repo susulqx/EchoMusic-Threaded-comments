@@ -1,0 +1,15 @@
+{
+  "id": "threaded-comments",
+  "name": "评论区树状显示",
+  "version": "0.1.0",
+  "description": "把楼层回复按回复关系缩进成树，支持线条引导与分支折叠。",
+  "author": "susulqx",
+  "icon": "icon.svg",
+  "main": "index.js",
+  "capabilities": {
+    "serverIntercept": true
+  },
+  "requires": {
+    "echoMusicVersion": ">=2.3.3-beta.1"
+  }
+}

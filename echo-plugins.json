@@ -1,0 +1,14 @@
+{
+  "plugins": [
+    {
+      "id": "threaded-comments",
+      "path": "",
+      "homepage": "https://github.com/susulqx/EchoMusic-Threaded-comments",
+      "tags": [
+        "comment",
+        "appearance",
+        "ui"
+      ]
+    }
+  ]
+}
