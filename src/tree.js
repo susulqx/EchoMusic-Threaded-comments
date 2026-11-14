@@ -33,9 +33,13 @@ export const computeDepthCap = (depth) => {
 };
 
 /**
- * 由 [{ id, pid, time }] 生成 [{ id, depth, parentId, hasChildren, descendantCount }]。
- * 输出按「父先子后」的深度优先顺序；同级按 time 升序、时间相同时按输入顺序。
+ * 由 [{ id, pid, time, order? }] 生成 [{ id, depth, parentId, hasChildren, descendantCount }]。
+ * 输出按「父先子后」的深度优先顺序；同级按 order 升序，没给 order 时退回 time。
  * pid 指向不存在的节点时视作根；成环的节点全部降级为根，避免死循环。
+ *
+ * order 是「这条回复在本楼层第几次被看到」，由调用方给。宿主加载更多时会把
+ * 整份列表按时间重排再渲染，更早的新回复会被插到旧回复中间；按 time 排就会
+ * 跟着宿主走，新批次散在两头。按 order 排的话旧回复位置不动、新回复连续收尾。
  */
 export function buildThreadTree(items, maxDepth) {
   const cap = maxDepth === undefined ? MAX_DEPTH : computeDepthCap(maxDepth);
@@ -48,6 +52,7 @@ export function buildThreadTree(items, maxDepth) {
       id,
       pid: item && item.pid != null ? String(item.pid) : "",
       time: toFiniteNumber(item && item.time, 0),
+      order: item && item.order != null ? toFiniteNumber(item.order, 0) : null,
       index,
     });
   });
@@ -89,9 +94,12 @@ export function buildThreadTree(items, maxDepth) {
     }
   }
 
+  const primary = (node) => (node.order === null ? node.time : node.order);
   const compare = (left, right) => {
-    const diff = byId.get(left).time - byId.get(right).time;
-    return diff !== 0 ? diff : byId.get(left).index - byId.get(right).index;
+    const a = byId.get(left);
+    const b = byId.get(right);
+    const diff = primary(a) - primary(b);
+    return diff !== 0 ? diff : a.index - b.index;
   };
   roots.sort(compare);
   for (const list of children.values()) list.sort(compare);

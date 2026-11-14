@@ -1094,6 +1094,67 @@ test('分界线粗细写进容器变量，关掉开关后撤除', async () => {
   assert.equal(container.style.getPropertyValue('--echo-tree-divider-width'), '', '关掉分界线就不写线宽');
 });
 
+// ---------- P4：按「首次看到」排序，不跟宿主的按时间重排 ----------
+
+test('新回复时间更早、被宿主插到最前面，仍按加载顺序排到旧回复之后', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  const { container, replies } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+  assert.deepEqual(replyOrder(container), ['甲', '乙', '丙', '丁'], '先按树序排好');
+
+  // 宿主加载更多：新来的「庚」时间比第一屏任何一条都早，mergeFloorReplies 会把它
+  // 排到整份列表最前面，容器里也插在第一个位置
+  const body = {
+    status: 1,
+    list: [
+      { comment_id: '15', pid: '10', user_name: '庚', addtime: '2025-01-01 09:00:00' },
+      ...floorBody().list,
+    ],
+  };
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body }));
+  const geng = makeReply('庚', '2025-01-01 09:00:00');
+  container.insertBefore(geng, container.children[0]);
+  await flush(container);
+
+  // 按时间排「庚」会被顶到最前、新批次散在两头；按首见序排它老老实实收尾
+  assert.deepEqual(
+    replyOrder(container),
+    ['甲', '乙', '丙', '丁', '庚'],
+    '新回复时间更早也要排在旧回复之后',
+  );
+  assert.equal(geng.getAttribute('data-echo-tree-depth'), '0');
+  assert.equal(geng.getAttribute('data-echo-tree-new-root'), 'on', '分界线画在新旧交界那一条');
+  for (const reply of replies) {
+    assert.equal(reply.getAttribute('data-echo-tree-new-root'), null, '旧回复不该被画线');
+  }
+});
+
+test('首见序只管兄弟之间，父子关系仍按接口给的 pid', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  const { container } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+
+  // 新来的一条挂在丙下面，但时间比谁都早：它该跟丙待在一起，而不是跑到最前当根
+  const body = {
+    status: 1,
+    list: [
+      { comment_id: '15', pid: '13', user_name: '庚', addtime: '2025-01-01 09:00:00' },
+      ...floorBody().list,
+    ],
+  };
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body }));
+  const geng = makeReply('庚', '2025-01-01 09:00:00');
+  container.insertBefore(geng, container.children[1]);
+  await flush(container);
+
+  assert.equal(geng.getAttribute('data-echo-tree-depth'), '3', '庚挂在丙（丙是乙的子）下面');
+  assert.deepEqual(replyOrder(container), ['甲', '乙', '丙', '庚', '丁'], '庚紧跟丙，不跑到最前');
+});
+
 // ---------- P3：调试出口 window.__echoTree ----------
 
 test('activate 挂上调试出口，deactivate 摘掉', async () => {

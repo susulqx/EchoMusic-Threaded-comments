@@ -22,7 +22,7 @@ import {
   releaseProtection,
 } from "./meta-cache.js";
 import { syncGuides } from "./guides.js";
-import { rememberOrder, syncReplyOrder } from "./order.js";
+import { orderOf, rememberOrder, syncReplyOrder } from "./order.js";
 import { syncPager } from "./pager.js";
 import { getSettings } from "./runtime.js";
 import { buildThreadTree, computeIndentStep, paginateTree } from "./tree.js";
@@ -44,7 +44,7 @@ const scheduleApply = (container) => {
  * 把「同一楼层内重复的对齐键」排除在树之外。
  * 同昵称 + 同秒在单楼层内极少见，一旦出现就无法判断谁是谁，宁可全部按根级平铺。
  */
-const collectItems = (keys) => {
+const collectItems = (keys, orderByKey) => {
   const keyCount = new Map();
   for (const key of keys) {
     if (!key) continue;
@@ -55,10 +55,12 @@ const collectItems = (keys) => {
   for (const key of keys) {
     if (!key || keyCount.get(key) !== 1) continue;
     const entry = lookupMeta(key);
+    const order = orderByKey ? orderByKey.get(key) : undefined;
     items.push({
       id: key,
       pid: entry && entry.pid ? lookupKeyById(entry.pid) : "",
       time: entry ? entry.timeMs : 0,
+      order: order === undefined ? null : order,
     });
   }
   return { items, keyCount };
@@ -209,7 +211,17 @@ export const applyContainer = (container) => {
   // 「这次新加载的回复」在排序之前就要定下来，排序会打乱元素顺序
   trackFreshKeys(state, keys);
 
-  const { items, keyCount } = collectItems(keys);
+  // 兄弟排序用「首次见到次序」而不是真实时间：宿主加载更多时会按时间重排整份
+  // 列表再渲染，跟着它排的话更早的新回复会被插到旧回复中间，新批次散成两截。
+  const byElement = orderOf(container);
+  const orderByKey = new Map();
+  if (byElement) {
+    for (const [element, key] of keyByElement) {
+      if (key && byElement.has(element)) orderByKey.set(key, byElement.get(element));
+    }
+  }
+
+  const { items, keyCount } = collectItems(keys, orderByKey);
   const tree = buildThreadTree(items);
   state.lastTree = tree;
   const nodeById = new Map(tree.map((node) => [node.id, node]));

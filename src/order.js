@@ -18,20 +18,42 @@ const isReply = (element) =>
 /** container -> Map(回复节点 -> 首次见到的次序) */
 const originals = new WeakMap();
 
-/** 记下节点在宿主里的原始位置；只记第一次，之后的移动不影响它 */
+/**
+ * 记下「第一次看到这条回复」的次序；之后的移动不影响它。
+ *
+ * 新出现的节点一律排在已有节点之后，而不是按它此刻在 DOM 里的位置编号。
+ * 宿主加载更多时会按时间把整份列表重排，更早的新回复会被插到最前面——
+ * 按位置编号的话它反而拿到最小号，排序时又跑到最前，等于跟着宿主漂。
+ *
+ * ponytail: 停用时按这套序号插回，若某批新回复被宿主插在前面，会落到末尾；
+ * 宿主下一次 patch 会自己拨回它的顺序。要精确还原就得另外记宿主每次给的
+ * 顺序（hostOrder），目前不值得为这一帧的偏差付这份复杂度。
+ */
 export const rememberOrder = (container, elements) => {
   let order = originals.get(container);
   if (!order) {
     order = new Map();
     originals.set(container, order);
   }
-  let next = order.size;
+  let next = 0;
+  for (const value of order.values()) if (value >= next) next = value + 1;
   for (const element of elements) {
     if (order.has(element)) continue;
     order.set(element, next);
     next += 1;
   }
 };
+
+/**
+ * 容器里的「首次见到次序」表：回复节点 -> 序号。
+ *
+ * 排序主键用它而不是真实时间：宿主加载更多时会把整份列表按时间重排再渲染，
+ * 更早的新回复会被插到旧回复中间，跟着时间排就等于跟着宿主漂。按首见序排，
+ * 旧回复位置不动、新回复连续收尾，分界线的「新旧交界」才站得住。
+ *
+ * 返回值只读，调用方不要改。
+ */
+export const orderOf = (container) => originals.get(container) || null;
 
 /**
  * 按 ordered 给出的顺序重排回复节点，其余回复保持原有相对顺序排在最后。
