@@ -102,30 +102,10 @@ const bundle = async (minify) =>
     logLevel: "warning",
   });
 
-/** 头部说明：模块清单取自 esbuild 的 metafile，顺序稳定 */
-const banner = (metafile, label) => {
-  const lines = [
-    "/**",
-    " * 评论区树状显示（threaded-comments）",
-    " *",
-    " * 本文件由 build.mjs（esbuild）从 src/ 打包生成，请勿直接编辑。",
-    " * 修改请改 src/ 下的模块，然后执行 node build.mjs。",
-    " *",
-    " * 构建模式：" + label,
-    " *",
-    " * 模块划分：",
-  ];
-  for (const file of Object.keys(metafile.inputs).sort()) {
-    lines.push(" *   " + file);
-  }
-  lines.push(" */");
-  return lines.join("\n");
-};
-
 const build = async () => {
   const result = await bundle(true);
   const label = TESTMODE ? "--test（压缩但保留标识符，用于排查）" : "最大压缩";
-  const code = banner(result.metafile, label) + "\n" + result.outputFiles[0].text;
+  const code = result.outputFiles[0].text;
   await writeFile(OUTPUT, code, "utf8");
 
   const inputs = Object.keys(result.metafile.inputs).length;

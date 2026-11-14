@@ -111,7 +111,7 @@ const computeHidden = (tree, state, pageById) => {
   return hiddenById;
 };
 
-const applyReply = (element, depth, hidden, collapsed) => {
+const applyReply = (element, depth, hidden, collapsed, fresh) => {
   element.setAttribute("data-echo-tree", "on");
   element.setAttribute("data-echo-tree-depth", String(depth));
   element.style.setProperty("--echo-tree-depth", String(depth));
@@ -121,6 +121,52 @@ const applyReply = (element, depth, hidden, collapsed) => {
 
   if (hidden) element.setAttribute("data-echo-tree-hidden", "on");
   else element.removeAttribute("data-echo-tree-hidden");
+
+  if (fresh) element.setAttribute("data-echo-tree-new", "on");
+  else element.removeAttribute("data-echo-tree-new");
+};
+
+/**
+ * 记下「这一次加载更多带进来的回复」，供红点与分界线使用。
+ *
+ * 为什么要记而不是每轮重算：重算会被宿主的任意一次 patch 触发（改文案、改头像），
+ * 每轮都按「当前 ∖ 历史」算的话，第一轮之后新增集就空了，红点会自己消失。
+ * 所以新增集只在真的出现新键时更新，中途的重算一直照着它画。
+ */
+const trackFreshKeys = (state, keys) => {
+  const present = new Set();
+  for (const key of keys) if (key) present.add(key);
+
+  if (!state.primed) {
+    // 第一次见到这个楼层：这些都是既有回复，不该标成新增
+    for (const key of present) state.seen.add(key);
+    state.primed = true;
+    return;
+  }
+
+  const added = new Set();
+  for (const key of present) if (!state.seen.has(key)) added.add(key);
+  if (added.size) state.fresh = added;
+  for (const key of present) state.seen.add(key);
+};
+
+/**
+ * 一级回复之间的分界线：只在「新旧交界」那一条上画，画在第一条新的一级回复上。
+ *
+ * 回复按树序重排后，新加载的一级回复会被插到它所属的旧评论下面，
+ * 用户看不出「从哪一条开始是新的一批」。分界线只做这件事，不表达层级。
+ * 子回复不参与：它们由红点表达，再给每棵子树画线只会把树切碎。
+ */
+const markNewRoots = (rows, settings) => {
+  let found = false;
+  for (const row of rows) {
+    // 开关关掉就不写这个属性：相邻回复的 border-top 本来被抹掉，
+    // 属性不存在时那条规则照常生效，视觉上就与没有分界线时完全一样
+    const boundary = settings.markDivider && !found && row.fresh && row.depth === 0;
+    if (boundary) found = true;
+    if (boundary) row.element.setAttribute("data-echo-tree-new-root", "on");
+    else row.element.removeAttribute("data-echo-tree-new-root");
+  }
 };
 
 /**
@@ -148,6 +194,9 @@ export const applyContainer = (container) => {
     return key;
   });
   protectKeys(container, keys);
+
+  // 「这次新加载的回复」在排序之前就要定下来，排序会打乱元素顺序
+  trackFreshKeys(state, keys);
 
   const { items, keyCount } = collectItems(keys);
   const tree = buildThreadTree(items);
@@ -178,8 +227,12 @@ export const applyContainer = (container) => {
     const depth = node ? node.depth : 0;
     const hidden = Boolean(node && hiddenById.get(node.id) === true);
     const collapsed = Boolean(node && state.collapsed.has(node.id));
+    // fresh 是「这次新加载进来的」，分界线要按它找一级回复；
+    // 红点只标二级及以下：新的一级回复由分界线表达，不重复标
+    const fresh = Boolean(key && state.fresh.has(key));
+    const freshChild = settings.markNew && fresh && depth > 0;
 
-    applyReply(element, depth, hidden, collapsed);
+    applyReply(element, depth, hidden, collapsed, freshChild);
     // 隐藏的行不参与画线：它们没有可量的矩形，Guide 只认可见的锚点
     if (!node || hidden) continue;
     rows.push({
@@ -189,8 +242,11 @@ export const applyContainer = (container) => {
       parentKey: node.parentId || "",
       hasChildren: node.hasChildren,
       collapsed,
+      fresh,
     });
   }
+
+  markNewRoots(rows, settings);
 
   syncGuides(container, rows, settings);
   syncPager(container, state, settings, pageById ? state.pageCount : 1);
@@ -257,6 +313,10 @@ export const setupContainer = (container) => {
     frame: 0,
     observer: null,
     onClick: null,
+    // 新增提醒：seen 是这个楼层见过的全部对齐键，fresh 是最近一次新增的那批
+    primed: false,
+    seen: new Set(),
+    fresh: new Set(),
   };
   containerStates.set(container, state);
 

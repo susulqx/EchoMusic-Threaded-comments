@@ -117,6 +117,16 @@ export const createSettingsComponent = (ctx) =>
             : null,
 
           settings.value.enabled
+            ? switchField("markNew", settings.value.markNew, (value) => ({ markNew: value }))
+            : null,
+
+          settings.value.enabled
+            ? switchField("markDivider", settings.value.markDivider, (value) => ({
+                markDivider: value,
+              }))
+            : null,
+
+          settings.value.enabled
             ? field(
                 t("settings.paginate.label"),
                 t("settings.paginate.desc", { perPage: ROOTS_PER_PAGE }),

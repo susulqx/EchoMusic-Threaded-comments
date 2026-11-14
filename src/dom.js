@@ -56,6 +56,8 @@ const REPLY_ATTRS = [
   "data-echo-tree-tail",
   "data-echo-tree-collapsed",
   "data-echo-tree-hidden",
+  "data-echo-tree-new",
+  "data-echo-tree-new-root",
 ];
 
 const CONTAINER_ATTRS = [

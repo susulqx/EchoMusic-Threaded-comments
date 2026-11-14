@@ -782,6 +782,157 @@ test('停用插件时撤掉引用标记，宿主原有引用块复原', async ()
   assert.equal(container.getAttribute('data-echo-quote-off'), null);
 });
 
+// ---------- P2：新加载回复的红点与分界线 ----------
+
+/** 追加一批回复 + 对应关系，模拟宿主「加载更多」 */
+const loadMore = async (container, extra, replies) => {
+  const body = { status: 1, list: [...floorBody().list, ...extra.body] };
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body }));
+  const added = appendReplies(container, extra.replies);
+  await flush(container);
+  return added;
+};
+
+/** 新来的一条一级回复 + 一条挂在乙下面的二级回复 */
+const moreBatch = {
+  // 庚 pid=10：与甲同级，是这次新来的一级回复
+  // 戊 pid=11：挂在乙下面，是这次新来的二级回复
+  body: [
+    { comment_id: '15', pid: '10', user_name: '庚', addtime: '2025-01-01 10:04:00' },
+    { comment_id: '16', pid: '11', user_name: '戊', addtime: '2025-01-01 10:05:00' },
+  ],
+  replies: [['庚', '2025-01-01 10:04:00'], ['戊', '2025-01-01 10:05:00']],
+};
+
+test('新加载的二级回复打红点，一级回复画分界线，旧回复两者都没有', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  const { container, replies } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+
+  // 首屏的回复只是既有内容，不该被标成新增
+  for (const reply of replies) {
+    assert.equal(reply.getAttribute('data-echo-tree-new'), null, '首屏不标红点');
+    assert.equal(reply.getAttribute('data-echo-tree-new-root'), null, '首屏不画分界线');
+  }
+  const [geng, wu] = await loadMore(container, moreBatch, replies);
+
+  // 戊挂在乙下面（depth 1）：红点，且不是一级回复，不画分界线
+  assert.equal(wu.getAttribute('data-echo-tree-depth'), '1');
+  assert.equal(wu.getAttribute('data-echo-tree-new'), 'on', '新来的子回复打红点');
+  assert.equal(wu.getAttribute('data-echo-tree-new-root'), null, '子回复不画分界线');
+
+  // 庚是这次新来的一级回复（depth 0）：画分界线，不点红点
+  assert.equal(geng.getAttribute('data-echo-tree-depth'), '0');
+  assert.equal(geng.getAttribute('data-echo-tree-new-root'), 'on', '新来的一级回复画分界线');
+  assert.equal(geng.getAttribute('data-echo-tree-new'), null, '一级回复只画线，不点红点');
+
+  // 旧回复一个都不能被误标
+  for (const reply of replies) {
+    assert.equal(reply.getAttribute('data-echo-tree-new'), null);
+    assert.equal(reply.getAttribute('data-echo-tree-new-root'), null);
+  }
+});
+
+test('重算不会让红点自己消失，只有下一次加载才换批', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  const { container, replies } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+  const [geng, wu] = await loadMore(container, moreBatch, replies);
+
+  // 宿主的任意一次 patch（改文案、折叠、翻页）都会触发重算，红点必须留存
+  await flush(container);
+  assert.equal(wu.getAttribute('data-echo-tree-new'), 'on', '重算后红点仍在');
+  assert.equal(geng.getAttribute('data-echo-tree-new-root'), 'on', '重算后分界线仍在');
+
+  // 折叠再展开也算重算
+  container.dispatch('click', { target: branchOf(container, '乙', '2025-01-01 10:01:00'), preventDefault() {}, stopPropagation() {} });
+  await tick();
+  assert.equal(wu.getAttribute('data-echo-tree-new'), 'on');
+  container.dispatch('click', { target: branchOf(container, '乙', '2025-01-01 10:01:00'), preventDefault() {}, stopPropagation() {} });
+  await tick();
+  assert.equal(wu.getAttribute('data-echo-tree-new'), 'on');
+});
+
+test('两个提醒各自可关，关掉后连属性都不写', async () => {
+  reset();
+  store.set('threaded-comments:settings', { enabled: true, markNew: false, markDivider: false });
+  await mod.activate(makeCtx());
+  const { container, replies } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+
+  const [geng, wu] = await loadMore(container, moreBatch, replies);
+  assert.equal(wu.getAttribute('data-echo-tree-new'), null, '关掉红点后不写属性');
+  assert.equal(geng.getAttribute('data-echo-tree-new-root'), null, '关掉分界线后不写属性');
+});
+
+test('只关一个开关时另一个照常工作', async () => {
+  reset();
+  store.set('threaded-comments:settings', { enabled: true, markNew: false, markDivider: true });
+  await mod.activate(makeCtx());
+  const { container, replies } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+  const [geng, wu] = await loadMore(container, moreBatch, replies);
+  assert.equal(wu.getAttribute('data-echo-tree-new'), null, '红点已关');
+  assert.equal(geng.getAttribute('data-echo-tree-new-root'), 'on', '分界线仍然画');
+
+  reset();
+  store.set('threaded-comments:settings', { enabled: true, markNew: true, markDivider: false });
+  await mod.activate(makeCtx());
+  const floor2 = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(floor2.container);
+  const [, wu2] = await loadMore(floor2.container, moreBatch, floor2.replies);
+  assert.equal(wu2.getAttribute('data-echo-tree-new'), 'on', '红点仍然打');
+});
+
+test('分界线只画在新旧交界的第一条一级回复上', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  const { container, replies } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+
+  // 这一次来了两条新的一级回复
+  const added = await loadMore(
+    container,
+    {
+      body: [
+        { comment_id: '15', pid: '10', user_name: '庚', addtime: '2025-01-01 10:04:00' },
+        { comment_id: '16', pid: '10', user_name: '辛', addtime: '2025-01-01 10:05:00' },
+      ],
+      replies: [['庚', '2025-01-01 10:04:00'], ['辛', '2025-01-01 10:05:00']],
+    },
+    replies,
+  );
+
+  const roots = added.filter((reply) => reply.getAttribute('data-echo-tree-depth') === '0');
+  assert.equal(roots.length, 2);
+  assert.equal(roots[0].getAttribute('data-echo-tree-new-root'), 'on', '第一条新的画线');
+  assert.equal(roots[1].getAttribute('data-echo-tree-new-root'), null, '第二条不重复画');
+});
+
+test('停用插件时清掉红点与分界线的全部标记', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  const { container, replies } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+  const [geng, wu] = await loadMore(container, moreBatch, replies);
+  assert.equal(wu.getAttribute('data-echo-tree-new'), 'on');
+
+  mod.deactivate();
+  assert.equal(container.getAttribute('data-echo-mark-new'), null);
+  assert.equal(container.getAttribute('data-echo-mark-divider'), null);
+  assert.equal(wu.getAttribute('data-echo-tree-new'), null);
+  assert.equal(geng.getAttribute('data-echo-tree-new-root'), null);
+});
+
 test('缓存淘汰不会挤掉正在展示的楼层锚点', async () => {
   reset();
   await mod.activate(makeCtx());

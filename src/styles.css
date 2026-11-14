@@ -130,6 +130,46 @@
 }
 
 /*
+ * 新加载出来的「二级及以下」回复：整条回复右上角一个红点。
+ *
+ * 为什么要标：重排会把新加载的子回复插到它所属的旧父评论下面，
+ * 位置跟着变了，肉眼很难看出哪几条才是这次新来的。
+ *
+ * 位置刻意避开头像：头像上可能有徽章、悬停菜单等宿主自己的角标，
+ * 也可能被用户点开主页，压一个圆点过去既挡内容又会误导。
+ * 圆点绝对定位在回复自身的右上角，不参与布局，也不吃点击
+ * （pointer-events: none），宿主的交互区一点不受影响。
+ */
+.comment-floor-inline > .comment-floor-reply[data-echo-tree-new][data-echo-tree] {
+  position: relative;
+}
+
+.comment-floor-inline > .comment-floor-reply[data-echo-tree-new][data-echo-tree]::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--state-danger, #ef4444);
+  pointer-events: none;
+}
+
+/*
+ * 新旧一级回复的分界线：画在第一条新的一级回复的上边框。
+ *
+ * 用 border-top 而不是伪元素：相邻回复之间的 border-top 已被上面那条规则
+ * 抹掉了（相邻回复 border-top: none），这里正好把这条单独补回来，
+ * 既是一条真灰线，也不占额外高度、不会把引导线的锚点挤歪。
+ */
+.comment-floor-inline
+  > .comment-floor-reply[data-echo-tree]
+  + .comment-floor-reply[data-echo-tree-new-root][data-echo-tree] {
+  border-top: 1px solid var(--border-light, #dedede);
+}
+
+/*
  * 回复下方那个引用块复述的是被回复评论的正文，树状缩进之后父评论就在上方，
  * 再复述一遍既重复又打断层级感。所以默认收起来。
  */

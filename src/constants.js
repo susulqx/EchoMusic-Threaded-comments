@@ -39,6 +39,8 @@ export const DEFAULT_SETTINGS = {
   containerHeight: 480,
   paginate: false,
   hideQuote: true,
+  markNew: true,
+  markDivider: true,
 };
 
 /** 固定高度容器：像素范围与滑块步进 */

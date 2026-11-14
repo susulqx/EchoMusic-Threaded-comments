@@ -26,6 +26,9 @@ export function normalizeSettings(raw) {
     containerHeight: clampHeight(height),
     paginate: Boolean(source.paginate),
     hideQuote: source.hideQuote === undefined ? DEFAULT_SETTINGS.hideQuote : Boolean(source.hideQuote),
+    markNew: source.markNew === undefined ? DEFAULT_SETTINGS.markNew : Boolean(source.markNew),
+    markDivider:
+      source.markDivider === undefined ? DEFAULT_SETTINGS.markDivider : Boolean(source.markDivider),
   };
 }
 
