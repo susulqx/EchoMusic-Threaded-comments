@@ -857,6 +857,36 @@ test('新加载的二级回复打红点，一级回复画分界线，旧回复�
   }
 });
 
+test('首屏回复是异步落地的：先挂上空容器，也不该把第一屏回复标成新增', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  // 宿主先渲染出容器（v-if 一开就有），回复要等 /comment/floor 回来才进 DOM
+  const container = new El('div');
+  container.className = 'comment-floor-inline';
+  observers[0].handler(container);
+  await flush(container);
+  assert.equal(container.children.length, 0, '此刻容器还是空的');
+
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  const replies = appendReplies(container, [
+    ['甲', '2025-01-01 10:00:00'],
+    ['乙', '2025-01-01 10:01:00'],
+    ['丙', '2025-01-01 10:02:00'],
+    ['丁', '2025-01-01 10:03:00'],
+  ]);
+  await flush(container);
+
+  for (const reply of replies) {
+    assert.equal(reply.getAttribute('data-echo-tree-new'), null, '第一屏回复不算新增');
+    assert.equal(reply.getAttribute('data-echo-tree-new-root'), null, '第一屏不画分界线');
+  }
+
+  // 之后真的「加载更多」，红点与分界线照常工作
+  const [geng, wu] = await loadMore(container, moreBatch, replies);
+  assert.equal(wu.getAttribute('data-echo-tree-new'), 'on', '之后的加载更多仍然要标');
+  assert.equal(geng.getAttribute('data-echo-tree-new-root'), 'on', '分界线仍然要画');
+});
+
 test('重算不会让红点自己消失，只有下一次加载才换批', async () => {
   reset();
   await mod.activate(makeCtx());

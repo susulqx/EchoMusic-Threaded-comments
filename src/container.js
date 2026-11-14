@@ -146,7 +146,10 @@ const trackFreshKeys = (state, keys) => {
   for (const key of keys) if (key) present.add(key);
 
   if (!state.primed) {
-    // 第一次见到这个楼层：这些都是既有回复，不该标成新增
+    // 第一次见到这个楼层：这些都是既有回复，不该标成新增。
+    // 但「一个回复都没有」不算见过 —— 宿主是异步拉取回复的，容器先以空的
+    // 形式挂上，把空的记成见过，第一屏回复落地时就会全被当成新增。
+    if (present.size === 0) return;
     for (const key of present) state.seen.add(key);
     state.primed = true;
     return;
