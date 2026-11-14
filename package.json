@@ -1,0 +1,15 @@
+{
+  "name": "echo-music-threaded-comments",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:test": "node build.mjs --test --out index.test-mode.js",
+    "watch": "node build.mjs --watch",
+    "test": "node --test tests/*.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

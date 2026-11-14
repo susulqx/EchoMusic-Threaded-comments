@@ -1,3 +1,9 @@
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
 /.dsh-uploads/
+
+# 构建依赖（esbuild），重装即可
+/node_modules/
+
+# --test 模式的对照产物，不发布
+/index.test-mode.js

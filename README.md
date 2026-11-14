@@ -46,14 +46,16 @@ EchoMusic 插件。把歌曲 / 专辑 / 歌单评论里的楼层回复，按回�
 源码在 `src/`，交付物 `index.js` 是打包产物（宿主通过 Blob URL 加载入口，入口里的相对 `import` 不会被解析，所以必须自包含单文件）。
 
 ```bash
-node build.mjs              # 打包 + 压缩，生成 index.js
-node build.mjs --no-minify  # 只打包不压缩，便于对照排查
+npm install                 # 只需一次，装 esbuild
+node build.mjs              # 最大压缩，生成交付物 index.js
+node build.mjs --test       # 压缩但保留函数名，便于对照堆栈
+node build.mjs --out x.js   # 写到别的文件，不覆盖交付物
 node build.mjs --watch      # 改 src/ 后自动重建
 ```
 
-依赖零成本：不引入 esbuild / rollup / 任何 npm 包，`build.mjs` 只做本项目用到的语法子集（静态相对 import、具名 export、export default）。
+打包与压缩都用 **esbuild**（`build.mjs` 只负责把 CSS 转成字符串模块、校验 CSS 结构、加文件头）。自己写词法扫描容易在细节上出错——例如 `[data-x] .y` 被压成 `[data-x].y` 就永远匹配不上；交给 esbuild 后这类问题由工具保证。
 
-压缩策略是**只删注释与空白，不重命名任何标识符**：产物里 `buildThreadTree`、`data-echo-tree-depth` 这类名字原样保留，线上排查照样能搜；同时不做任何会改变运行时的变换，性能与未压缩版一致（约 71 KB → 46 KB）。
+`src/styles.css` 在构建期被压缩成字符串常量内联进 `index.js`，产物无任何 `.css` 引用，运行时零额外开销。默认模式重命名局部标识符（约 46 KB → 25 KB）；`--test` 模式保留函数名（约 40 KB），线上崩溃时堆栈能直接对上 `src/` 的代码。
 
 | 模块 | 职责 |
 | --- | --- |
@@ -86,7 +88,7 @@ node --test tests/threaded-comments.test.mjs tests/threaded-comments.dom.test.mj
 
 - `threaded-comments.test.mjs`：纯函数（设置归一化、树构建断环 / 深度上限 / 同级排序、对齐键、缩进步长）+ 文案与产物自包含。
 - `threaded-comments.dom.test.mjs`：用最小 DOM 桩驱动完整链路 —— 拦截器采集关系 → 楼层打标 → 一级回复由根分支串联 → 子回复排到父评论下方 → 隐藏引用 → 折叠 → 分页切页 → 加载更多后保持折叠 → 关闭与卸载清理与顺序还原。
-- `build.test.mjs`：对**打包产物**跑一次真实 `activate`，校验注入的 CSS 结构完整、导出与拦截器契约不变、压缩未重命名标识符。
+- `build.test.mjs`：对**打包产物**跑一次真实 `activate`，校验注入的 CSS 结构完整（花括号与 `!important` 数量对齐源文件、关键规则齐全、选择器里的后代组合子空格没被吃掉）、导出与拦截器契约不变、运行时字符串保留、`--test` 产物保留函数名且同样能激活。
 
 ## 兼容性
 

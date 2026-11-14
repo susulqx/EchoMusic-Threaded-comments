@@ -166,5 +166,5 @@ test("界面文案都登记在 i18n 里，其它模块无中文字面量", async
 test("打包产物自包含：无相对 import，可直接经 Blob URL 加载", () => {
   assert.doesNotMatch(source, /^\s*import\s[^;]*from\s*["']\./m);
   assert.doesNotMatch(source, /from\s*["'][^"']*\.css["']/);
-  assert.match(source, /由 build\.mjs 从 src\/ 打包生成/);
+  assert.match(source, /由 build\.mjs.*从 src\/ 打包生成/);
 });
