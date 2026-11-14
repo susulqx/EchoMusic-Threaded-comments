@@ -81,7 +81,7 @@ node build.mjs --watch      # 改 src/ 后自动重建
 
 打包与压缩都用 **esbuild**（`build.mjs` 只负责把 CSS 转成字符串模块、校验 CSS 结构、加文件头）。自己写词法扫描容易在细节上出错——例如 `[data-x] .y` 被压成 `[data-x].y` 就永远匹配不上；交给 esbuild 后这类问题由工具保证。
 
-`src/styles.css` 在构建期被压缩成字符串常量内联进 `index.js`，产物无任何 `.css` 引用，运行时零额外开销。默认模式重命名局部标识符（约 70 KB → 32 KB）；`--test` 模式保留函数名（约 49 KB），线上崩溃时堆栈能直接对上 `src/` 的代码。
+`src/styles.css` 在构建期被压缩成字符串常量内联进 `index.js`，产物无任何 `.css` 引用，运行时零额外开销。默认模式重命名局部标识符；`--test` 模式保留函数名与标识符，线上崩溃时堆栈能直接对上 `src/` 的代码。
 
 | 模块 | 职责 |
 | --- | --- |
@@ -121,6 +121,14 @@ node --test tests/threaded-comments.test.mjs tests/threaded-comments.dom.test.mj
 
 - 需要 EchoMusic `>=2.3.2`。
 - 依赖宿主的评论楼层类名（`.comment-floor-inline`、`.comment-floor-reply` 等）。宿主若调整这些类名，插件会安静地不生效，不会破坏页面。
+
+## 持续集成
+
+`.github/workflows/build.yml` 在每次推送到 `main` 后重新打包、跑一遍 `npm test`，再把打出来的产物与仓库里的 `index.js` 逐字节比对（先打包再测试：测试读的是仓库里的 `index.js`，不先打包就会测到上一版产物）。两条都过就不管；产物对不上说明提交时忘了打包（或打包环境与提交的不一致），action 会用自己打出来的那份覆盖 `index.js` 提交回 `main`，提交信息带 `[skip ci]`，因此这次回写不会再触发一轮检查。
+
+因此推送前不必强制先打包，但要让 CI 无事可做，还是本地 `node build.mjs && npm test` 一遍再提交。`index.js` 在 `.gitattributes` 里标了 `-text`：它是字节产物，换行被转换过就会让比对误报。
+
+要让 action 能写回仓库，仓库设置里 `Settings → Actions → General → Workflow permissions` 需选 `Read and write permissions`；`main` 若有分支保护规则，需允许 `github-actions[bot]` 直推，否则回写那步会失败（测试与比对不受影响）。
 
 ## 已知限制
 

@@ -52,8 +52,7 @@ export const MIN_DIVIDER_WIDTH = 1;
 export const MAX_DIVIDER_WIDTH = 6;
 export const DIVIDER_WIDTH_STEP = 1;
 
-/** 红点尺寸与离内容右端的让位距离 */
-export const NEW_DOT_SIZE = 8;
+/** 红点离名字行内容右端的让位距离（尺寸本身写在 styles.css） */
 export const NEW_DOT_GAP = 2;
 
 /** 固定高度容器：像素范围与滑块步进 */

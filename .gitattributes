@@ -1,0 +1,3 @@
+# index.js 是 esbuild 打出来的字节产物，CI 逐字节比对。
+# 任何换行转换（Windows 上 checkout 成 CRLF）都会让比对误报，所以按二进制存。
+index.js -text

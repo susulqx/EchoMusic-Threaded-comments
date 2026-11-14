@@ -147,7 +147,9 @@
   content: "";
   position: absolute;
   left: var(--echo-tree-dot-x, 0);
+  /* 变量给的是该行中线，点自身再上移一半才居中 */
   top: var(--echo-tree-dot-y, 8px);
+  transform: translateY(-50%);
   width: 8px;
   height: 8px;
   border-radius: 50%;

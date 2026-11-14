@@ -1,0 +1,67 @@
+# 推送后：先跑测试，再重新打包，与仓库里提交的 index.js 逐字节比对。
+# 不一致就说明提交时忘了打包（或本地打包环境与这里不同），
+# 由 action 用自己打出来的那份覆盖仓库，回写的提交带 [skip ci] 不会再触发一轮。
+#
+# 需要仓库 Settings → Actions → General → Workflow permissions 选
+# "Read and write permissions"，否则最后一步推不回去。
+
+name: build
+
+on:
+  push:
+    branches: [main]
+
+# 同一分支的任务排队而不是并行：两个任务同时回写会互相顶掉。
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # 自己回写的那次提交不重跑（[skip ci] 已被 GitHub 内置跳过，这里再兜一层）
+    if: >-
+      github.actor != 'github-actions[bot]' &&
+      !contains(github.event.head_commit.message, '[skip ci]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      # 先打包再测试：测试读的是仓库里的 index.js，不先重新打包，
+      # 测到的就是上一版产物，提交里忘了打包也发现不了。
+      - name: 打包
+        run: npm run build
+
+      - name: 测试
+        run: npm test
+
+      - name: 比对产物
+        id: diff
+        run: |
+          if git diff --quiet -- index.js; then
+            echo "产物与提交一致"
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::提交的 index.js 与源码打出来的不一致，将由 action 覆盖"
+            git --no-pager diff --stat -- index.js
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 回写产物
+        if: steps.diff.outputs.stale == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.js
+          git commit -m "chore: 用源码重新打包 index.js [skip ci]"
+          git push
