@@ -54,7 +54,8 @@
   outline: none;
 }
 
-.echo-tree-branch-line {
+.echo-tree-branch-line,
+.echo-tree-root-line {
   fill: none;
   stroke: var(--echo-tree-line);
   stroke-width: 2px;
@@ -63,6 +64,11 @@
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
   transition: stroke 0.15s ease;
+}
+
+/* 根线连的是主评论与一级回复，没有折叠语义，因此不参与 hover 高亮 */
+.echo-tree-root-line {
+  pointer-events: none;
 }
 
 .echo-tree-branch-hit {

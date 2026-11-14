@@ -8,7 +8,7 @@
  * 几何口径与宿主无关：坐标系取容器 padding box 的左上角。
  */
 
-import { AVATAR_CLASS, FOOTER_CLASS } from "./constants.js";
+import { AVATAR_CLASS, FOOTER_CLASS, ROOT_AVATAR_CLASS, ROOT_ITEM_CLASS } from "./constants.js";
 import { t } from "./i18n.js";
 
 export const GUIDES_CLASS = "echo-tree-guides";
@@ -19,6 +19,7 @@ export const NODE_CLASS = "echo-tree-branch-node";
 export const NODE_HIT_CLASS = "echo-tree-branch-node-hit";
 export const NODE_FOCUS_CLASS = "echo-tree-branch-node-focus";
 export const SYMBOL_CLASS = "echo-tree-branch-symbol";
+export const ROOT_LINE_CLASS = "echo-tree-root-line";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -192,6 +193,18 @@ const makeLocal = (container) => {
   });
 };
 
+/** 由头像矩形得到锚点；底栏缺失或高度为 0 时贴着头像底边 */
+const anchorOfBox = (box, footerBox) => {
+  const footerCenterY = footerBox && footerBox.height > 0 ? footerBox.centerY : box.bottom;
+  return {
+    bottom: box.bottom,
+    centerX: box.centerX,
+    centerY: box.centerY,
+    left: box.left,
+    toggleY: Math.max(box.bottom, footerCenterY),
+  };
+};
+
 /** 读一个回复的锚点；拿不到头像矩形时返回 null，调用方跳过该行 */
 const readAnchor = (element, local) => {
   const avatar = element.querySelector("." + AVATAR_CLASS);
@@ -201,16 +214,47 @@ const readAnchor = (element, local) => {
   if (box.width <= 0 || box.height <= 0) return null;
 
   const footer = element.querySelector("." + FOOTER_CLASS);
-  const footerBox = footer ? local(footer.getBoundingClientRect()) : null;
-  const footerCenterY = footerBox && footerBox.height > 0 ? footerBox.centerY : box.bottom;
+  return anchorOfBox(box, footer ? local(footer.getBoundingClientRect()) : null);
+};
 
-  return {
-    bottom: box.bottom,
-    centerX: box.centerX,
-    centerY: box.centerY,
-    left: box.left,
-    toggleY: Math.max(box.bottom, footerCenterY),
-  };
+/**
+ * 主评论自己的头像。
+ * 楼层容器在 .comment-main 里，主评论头像在它的兄弟列上，所以只能从容器往上找 .comment-item。
+ */
+const findRootAvatar = (container) => {
+  let item = container.parentNode;
+  while (item && !(item.classList && item.classList.contains(ROOT_ITEM_CLASS))) {
+    item = item.parentNode;
+  }
+  if (!item) return null;
+  for (const child of item.children) {
+    if (child.classList && child.classList.contains(ROOT_AVATAR_CLASS)) return child;
+  }
+  return null;
+};
+
+const readRootAnchor = (container, local) => {
+  const avatar = findRootAvatar(container);
+  if (!avatar) return null;
+  const box = local(avatar.getBoundingClientRect());
+  if (box.width <= 0 || box.height <= 0) return null;
+  return anchorOfBox(box, null);
+};
+
+/** 根分支只画线、不放节点：收起整层仍交给宿主的「收起回复」按钮 */
+const syncRootLine = (svg, path) => {
+  let line = svg.querySelector("." + ROOT_LINE_CLASS);
+  if (!path) {
+    if (line && line.parentNode) line.parentNode.removeChild(line);
+    return;
+  }
+  if (!line) {
+    line = document.createElementNS(SVG_NS, "path");
+    line.setAttribute("class", ROOT_LINE_CLASS);
+    // 排在分支组之前，节点圆环才能盖住线头
+    svg.insertBefore(line, svg.children[0] || null);
+  }
+  line.setAttribute("d", path);
 };
 
 /**
@@ -242,8 +286,35 @@ export const syncGuides = (container, rows, settings) => {
     childrenOf.get(row.parentKey).push(row);
   }
 
+  /*
+   * 根分支：从主评论头像往下连到每一个一级回复。
+   * 没有它，同层的一级回复之间就只剩各自的子树，彼此看起来毫无关系。
+   * 只画线不放节点 —— 整层的收起仍由宿主的「收起回复」按钮负责。
+   *
+   * 固定高度容器模式下主评论在滚动区之外，而图层随内容一起滚，
+   * 线头会跟着滚出视口，所以这种情况下不画。
+   */
+  const rootAnchor = settings.container ? null : readRootAnchor(container, local);
+  const rootChildren = rootAnchor
+    ? rows
+        .filter((row) => row.depth === 0 && anchorByKey.has(row.key))
+        .map((row) => anchorByKey.get(row.key))
+        .filter((anchor) => anchor.left > rootAnchor.centerX)
+    : [];
+  const rootPath = rootAnchor && rootChildren.length > 0
+    ? branchPath(rootAnchor, rootChildren, false, collapseParentBody)
+    : null;
+
   const drawn = [];
   let maxY = 0;
+  // 主评论头像在容器左侧与上方的容器外区域，线头会落到负坐标，图层要跟着扩出去
+  let minX = 0;
+  let minY = 0;
+  if (rootPath) {
+    minX = Math.min(minX, rootAnchor.centerX - HIT_RADIUS);
+    minY = Math.min(minY, rootAnchor.bottom);
+    for (const child of rootChildren) maxY = Math.max(maxY, child.centerY + HIT_RADIUS);
+  }
   for (const row of rows) {
     if (!row.hasChildren) continue;
     const parent = anchorByKey.get(row.key);
@@ -267,21 +338,29 @@ export const syncGuides = (container, rows, settings) => {
     for (const child of children) maxY = Math.max(maxY, child.centerY + HIT_RADIUS);
   }
 
-  if (drawn.length === 0) {
+  if (drawn.length === 0 && !rootPath) {
     if (layer && layer.parentNode) layer.parentNode.removeChild(layer);
     layers.delete(container);
     return;
   }
 
   const svg = ensureLayer(container);
-  const width = Math.max(1, container.clientWidth);
-  const height = Math.max(1, maxY);
-  svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+  const width = Math.max(1, container.clientWidth - minX);
+  const height = Math.max(1, maxY - minY);
+  svg.setAttribute("viewBox", [minX, minY, width, height].map(coord).join(" "));
   svg.setAttribute("preserveAspectRatio", "none");
-  svg.style.width = "100%";
-  svg.style.height = height + "px";
+  // 宽度与 viewBox 一致，缩放比恒为 1，线宽才不会被拉变形
+  svg.style.left = coord(minX) + "px";
+  svg.style.top = coord(minY) + "px";
+  svg.style.width = coord(width) + "px";
+  svg.style.height = coord(height) + "px";
 
-  const existing = Array.from(svg.children);
+  syncRootLine(svg, rootPath);
+
+  // 根线是 svg 的第一个子节点，分支组只能从它后面开始对齐
+  const existing = Array.from(svg.children).filter(
+    (node) => !(node.classList && node.classList.contains(ROOT_LINE_CLASS)),
+  );
   for (let index = 0; index < drawn.length; index += 1) {
     const entry = drawn[index];
     let group = existing[index];

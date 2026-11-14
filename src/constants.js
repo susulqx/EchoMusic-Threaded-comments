@@ -9,6 +9,7 @@
  *   时间     .comment-floor-reply-time      形如「2025-01-01 10:00:00 · 广东」
  *   回复头   .comment-floor-reply-header    折叠按钮插在它的末尾
  *   加载更多 .comment-floor-more > .comment-floor-more-btn
+ *   主评论   .comment-item > .comment-avatar 容器在 .comment-main 里，主评论头像在它的兄弟列
  */
 
 export const STORAGE_KEY = "threaded-comments:settings";
@@ -25,6 +26,10 @@ export const AVATAR_CLASS = "comment-floor-reply-avatar";
 export const FOOTER_CLASS = "comment-floor-reply-footer";
 export const MORE_CLASS = "comment-floor-more";
 export const MORE_BUTTON_CLASS = "comment-floor-more-btn";
+
+/** 主评论容器与它的头像列：根分支要从主评论头像往下一级回复连线 */
+export const ROOT_ITEM_CLASS = "comment-item";
+export const ROOT_AVATAR_CLASS = "comment-avatar";
 
 export const DEFAULT_SETTINGS = {
   enabled: true,

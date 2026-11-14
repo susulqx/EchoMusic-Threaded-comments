@@ -60,7 +60,19 @@ const layoutContainer = (container) => {
   rects.set(container, rect(0, 0, 800, top));
 };
 
+/**
+ * 主评论头像不在楼层容器内（容器只是 .comment-main 里的一块），
+ * 它没有容器可换算出局部坐标，桩里直接给一个固定在容器左上方的矩形。
+ */
+const ROOT_AVATAR_RECT = rect(-45, -96, 36, 36);
+const isRootAvatar = (el) => {
+  if (!matches(el, 'comment-avatar')) return false;
+  const item = el.parent;
+  return Boolean(item && matches(item, 'comment-item'));
+};
+
 const measureRect = (el) => {
+  if (isRootAvatar(el)) return ROOT_AVATAR_RECT;
   const container = findContainer(el);
   if (!container) return null;
   layoutContainer(container);
@@ -427,6 +439,81 @@ test('子回复紧跟父评论：ABCD 且 D 是 A 的回复 → ADCB', async () 
   assert.deepEqual(depthInDom(), ['A:0', 'D:1', 'B:0', 'C:0']);
   mod.deactivate();
   assert.deepEqual(replyOrder(container), ['A', 'B', 'C', 'D'], '停用后还原宿主的原始次序');
+});
+
+/**
+ * 带主评论的楼层：.comment-item > (.comment-avatar, .comment-main > .comment-floor-inline)。
+ * 主评论本身不是 .comment-floor-reply，容器里只有它的一级回复。
+ */
+const buildFloorWithRoot = () => {
+  const item = new El('div');
+  item.className = 'comment-item';
+  const avatar = new El('div');
+  avatar.className = 'comment-avatar';
+  item.appendChild(avatar);
+  const main = new El('div');
+  main.className = 'comment-main';
+  item.appendChild(main);
+  const container = new El('div');
+  container.className = 'comment-floor-inline';
+  main.appendChild(container);
+
+  const replies = [
+    makeReply('A', '2025-01-01 10:00:00'),
+    makeReply('B', '2025-01-01 10:01:00'),
+    makeReply('C', '2025-01-01 10:02:00'),
+    makeReply('D', '2025-01-01 10:03:00'),
+    makeReply('E', '2025-01-01 10:04:00'),
+  ];
+  for (const reply of replies) container.appendChild(reply);
+  return { container, replies };
+};
+
+/** A（BC）DE：根评论下 A、D、E 是一级回复，B、C 挂在 A 下 */
+const rootSiblingBody = () => ({
+  status: 1,
+  list: [
+    { comment_id: '1', pid: '0', user_name: 'A', addtime: '2025-01-01 10:00:00' },
+    { comment_id: '2', pid: '1', user_name: 'B', addtime: '2025-01-01 10:01:00' },
+    { comment_id: '3', pid: '1', user_name: 'C', addtime: '2025-01-01 10:02:00' },
+    { comment_id: '4', pid: '0', user_name: 'D', addtime: '2025-01-01 10:03:00' },
+    { comment_id: '5', pid: '0', user_name: 'E', addtime: '2025-01-01 10:04:00' },
+  ],
+});
+
+test('一级回复之间由主评论的根分支串起来', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  const { container, replies } = buildFloorWithRoot();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({
+    status: 200,
+    body: rootSiblingBody(),
+  }));
+  await flush(container);
+
+  assert.deepEqual(replies.map((reply) => reply.getAttribute('data-echo-tree-depth')), [
+    '0', '1', '1', '0', '0',
+  ], 'A、D、E 是一级回复，B、C 在 A 下');
+
+  const rootLine = container.querySelector('.echo-tree-root-line');
+  assert.ok(rootLine, '一级回复之间要有从主评论接下来的线');
+  const path = rootLine.getAttribute('d');
+  // 主干从头像正下方出发，往每一条一级回复各画一段
+  assert.match(path, /^M -27 -60 V /);
+  assert.equal(path.split(' H ').length - 1, 3, 'A、D、E 各一段水平分支');
+  // 根线只是线，不带折叠节点：折叠按钮仍然只有 A 一个
+  assert.deepEqual(branchKeys(container), [keyOf('A', '2025-01-01 10:00:00')]);
+});
+
+test('主评论结构不明时不画根分支，也不影响子树', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  // buildFloor 的容器没有 .comment-item 祖先，量不到主评论头像
+  const { container } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+  assert.equal(container.querySelector('.echo-tree-root-line'), null);
+  assert.equal(container.querySelectorAll('.echo-tree-branch').length, 2, '子树照旧');
 });
 
 test('无法对齐的回复保持根级平铺，不误挂', async () => {
