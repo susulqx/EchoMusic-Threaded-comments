@@ -58,6 +58,16 @@ export const MESSAGES = {
     "pager.loadMore": "加载更多",
     "pager.info": "第 {page} / {total} 页",
 
+    // 多行说明用模板串：调试出口打给开发者看，不进 UI
+    "debug.help": `__echoTree 调试出口：
+  containers()    当前接管的楼层与摘要
+  rows(el?)       回复的真实 DOM 顺序、层级与标记
+  tree(el?)       最近一次算出的回复树
+  recompute(el?)  立刻重算（不传=全部）
+  settings()      当前生效的设置
+  guides(el?)     引导线绘制快照：量出的矩形、viewBox、每条分支的路径
+  css(el?)        关键计算样式（容器 / 回复 / 红点伪元素）`,
+
     "toast.saveFailed": "树状评论设置保存失败：{message}",
     "console.collectFailed": "[threaded-comments] 回复关系采集失败",
   },

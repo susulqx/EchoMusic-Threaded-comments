@@ -200,6 +200,7 @@ export const applyContainer = (container) => {
 
   const { items, keyCount } = collectItems(keys);
   const tree = buildThreadTree(items);
+  state.lastTree = tree;
   const nodeById = new Map(tree.map((node) => [node.id, node]));
 
   // 对齐键唯一的回复才有资格排序；对不上的留在原地，不猜位置
@@ -317,6 +318,8 @@ export const setupContainer = (container) => {
     primed: false,
     seen: new Set(),
     fresh: new Set(),
+    // 最近一次算出的树，只给调试出口读，不参与任何逻辑
+    lastTree: null,
   };
   containerStates.set(container, state);
 
@@ -340,6 +343,27 @@ export const teardownContainer = (container) => {
   if (state.onClick) container.removeEventListener("click", state.onClick, true);
   clearContainerMarks(container, releaseProtection);
   containerStates.delete(container);
+};
+
+/**
+ * 调试快照：每个在线楼层一份可读副本（由 window.__echoTree 使用）。
+ * 返回副本而不是 state 本体 —— 控制台里翻看对象时不会顺手改坏内部状态。
+ */
+export const describeContainers = () => {
+  const list = [];
+  for (const [container, state] of containerStates) {
+    list.push({
+      element: container,
+      connected: Boolean(container.isConnected),
+      page: state.page,
+      pageCount: state.pageCount,
+      collapsed: Array.from(state.collapsed),
+      fresh: Array.from(state.fresh),
+      seen: state.seen.size,
+      tree: (state.lastTree || []).map((node) => ({ ...node })),
+    });
+  }
+  return list;
 };
 
 /** 设置变更后立刻刷新所有在线容器，无需用户重新展开楼层 */

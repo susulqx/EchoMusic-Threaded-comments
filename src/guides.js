@@ -8,7 +8,13 @@
  * 几何口径与宿主无关：坐标系取容器 padding box 的左上角。
  */
 
-import { AVATAR_CLASS, FOOTER_CLASS, ROOT_AVATAR_CLASS, ROOT_ITEM_CLASS } from "./constants.js";
+import {
+  AVATAR_CLASS,
+  FOOTER_CLASS,
+  REPLY_CLASS,
+  ROOT_AVATAR_CLASS,
+  ROOT_ITEM_CLASS,
+} from "./constants.js";
 import { t } from "./i18n.js";
 
 export const GUIDES_CLASS = "echo-tree-guides";
@@ -405,6 +411,71 @@ export const syncGuides = (container, rows, settings) => {
     const extra = existing[index];
     if (extra.parentNode) extra.parentNode.removeChild(extra);
   }
+};
+
+/**
+ * 绘制快照：给调试出口看「线为什么这样画（或者为什么没画）」。
+ *
+ * 返回量出来的原始矩形（容器局部坐标）与最终落在 SVG 上的属性，
+ * 两者能对上说明几何没问题；对不上就看 viewBox 与内联 left/top 是否被别处改过。
+ */
+export const describeGuides = (container) => {
+  const local = makeLocal(container);
+  const anchors = [];
+  for (const element of Array.from(container.children || [])) {
+    if (!(element.classList && element.classList.contains(REPLY_CLASS))) continue;
+    const avatar = element.querySelector("." + AVATAR_CLASS);
+    const footer = element.querySelector("." + FOOTER_CLASS);
+    anchors.push({
+      element,
+      depth: Number(element.getAttribute("data-echo-tree-depth") || 0),
+      hidden: element.hasAttribute("data-echo-tree-hidden"),
+      avatar: avatar ? local(avatar.getBoundingClientRect()) : null,
+      footer: footer ? local(footer.getBoundingClientRect()) : null,
+      anchor: readAnchor(element, local),
+    });
+  }
+
+  const layer = layers.get(container);
+  const rootAvatar = findRootAvatar(container);
+  const branches = [];
+  let rootPath = null;
+  if (layer) {
+    const rootLine = layer.querySelector("." + ROOT_LINE_CLASS);
+    rootPath = rootLine ? rootLine.getAttribute("d") : null;
+    for (const group of Array.from(layer.children)) {
+      if (!(group.classList && group.classList.contains(BRANCH_CLASS))) continue;
+      const line = group.querySelector("." + PATH_CLASS);
+      const node = group.querySelector("." + NODE_CLASS);
+      branches.push({
+        key: group.getAttribute("data-echo-tree-key"),
+        expanded: group.getAttribute("aria-expanded") !== "false",
+        path: line ? line.getAttribute("d") : null,
+        node: node
+          ? { cx: node.getAttribute("cx"), cy: node.getAttribute("cy"), r: node.getAttribute("r") }
+          : null,
+      });
+    }
+  }
+
+  return {
+    // 图层是否真的挂上了，以及它的定位/尺寸（负坐标说明画到了容器外）
+    layer: layer || null,
+    viewBox: layer ? layer.getAttribute("viewBox") : null,
+    box: layer
+      ? {
+          left: layer.style.left,
+          top: layer.style.top,
+          width: layer.style.width,
+          height: layer.style.height,
+        }
+      : null,
+    sizing: { clientWidth: container.clientWidth, clientLeft: container.clientLeft, clientTop: container.clientTop },
+    rootAvatar: rootAvatar ? local(rootAvatar.getBoundingClientRect()) : null,
+    rootPath,
+    branches,
+    anchors,
+  };
 };
 
 /** 关闭功能或容器销毁时整层移除 */

@@ -15,6 +15,7 @@
  *   src/pager.js         楼层内分页条
  *   src/interactions.js  点击意图解析
  *   src/container.js     楼层容器的装配与重算
+ *   src/debug.js         调试出口 window.__echoTree
  *   src/settings-page.js 设置页组件
  *   src/styles.css       全部样式
  *
@@ -25,6 +26,7 @@
 
 import { COLLECTOR_PRIORITY, DEFAULT_SETTINGS, STORAGE_KEY } from "./constants.js";
 import { setupContainer, teardownAllContainers } from "./container.js";
+import { installDebug, removeDebug } from "./debug.js";
 import { MESSAGES, setLocale, t } from "./i18n.js";
 import { collectRelations, resetMetaCaches } from "./meta-cache.js";
 import { createRuntime, disposeRuntime } from "./runtime.js";
@@ -71,9 +73,14 @@ export async function activate(ctx) {
   );
 
   observeDispose = ctx.dom.observe(".comment-floor-inline", (container) => setupContainer(container));
+
+  // 调试出口：控制台里 __echoTree.help() 有全部用法
+  installDebug();
 }
 
 export function deactivate() {
+  removeDebug();
+
   observeDispose?.();
   observeDispose = null;
   interceptDispose?.();

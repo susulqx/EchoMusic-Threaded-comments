@@ -215,6 +215,18 @@ globalThis.document = {
   createElementNS: (ns, tag) => new El(tag),
   body: new El('body'),
 };
+
+// 调试出口挂在 window 上，桩必须提供；计算样式按「读内联 + 属性」给个最小实现，
+// 足够验证 __echoTree.css() 真的取到了值，不校验浏览器排版结果
+globalThis.window = globalThis;
+globalThis.getComputedStyle = (el, pseudo) => {
+  const read = (key) => {
+    if (pseudo) return el.__pseudoStyle?.[pseudo]?.[key] || '';
+    if (key.startsWith('--')) return el.style.getPropertyValue(key);
+    return el.__computed?.[key] || '';
+  };
+  return { getPropertyValue: read };
+};
 globalThis.MutationObserver = class {
   observe() {}
   disconnect() {}
@@ -931,6 +943,97 @@ test('停用插件时清掉红点与分界线的全部标记', async () => {
   assert.equal(container.getAttribute('data-echo-mark-divider'), null);
   assert.equal(wu.getAttribute('data-echo-tree-new'), null);
   assert.equal(geng.getAttribute('data-echo-tree-new-root'), null);
+});
+
+// ---------- P3：调试出口 window.__echoTree ----------
+
+test('activate 挂上调试出口，deactivate 摘掉', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  assert.ok(globalThis.__echoTree, 'activate 后应有 __echoTree');
+  for (const name of ['containers', 'rows', 'tree', 'recompute', 'settings', 'guides', 'css', 'help']) {
+    assert.equal(typeof globalThis.__echoTree[name], 'function', '缺少方法：' + name);
+  }
+  mod.deactivate();
+  assert.equal(globalThis.__echoTree, undefined, '停用后不应留下全局');
+});
+
+test('调试出口看得到楼层、回复顺序与标记', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  const { container, replies } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+
+  const list = globalThis.__echoTree.containers();
+  assert.equal(list.length, 1);
+  assert.equal(list[0].element, container);
+  assert.equal(list[0].replies, 4);
+
+  const rows = globalThis.__echoTree.rows(container);
+  assert.deepEqual(rows.map((row) => row.depth), [0, 1, 2, 1]);
+  assert.equal(rows[0].key, keyOf('甲', '2025-01-01 10:00:00'));
+
+  const tree = globalThis.__echoTree.tree(container);
+  assert.deepEqual(tree.map((node) => node.id), rows.map((row) => row.key));
+});
+
+test('调试出口的 recompute 会立刻重算', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  const { container } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+  assert.equal(globalThis.__echoTree.recompute(container), 1);
+  assert.equal(globalThis.__echoTree.recompute(), 1, '不传目标则重算全部');
+});
+
+test('调试出口返回副本，改它不影响插件内部状态', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  const { container } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+
+  const settings = globalThis.__echoTree.settings();
+  settings.mode = 'indentOnly';
+  assert.equal(globalThis.__echoTree.settings().mode, 'lineKeepMain', '改副本不该影响实际设置');
+
+  const tree = globalThis.__echoTree.tree(container);
+  if (tree.length) tree[0].depth = 99;
+  assert.equal(globalThis.__echoTree.tree(container)[0].depth, 0, '改副本不该影响树');
+});
+
+test('调试出口能给出引导线的绘制快照', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  const { container } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+
+  const guides = globalThis.__echoTree.guides(container);
+  assert.ok(guides, '应返回绘制快照');
+  assert.ok(guides.viewBox, '图层应带 viewBox');
+  assert.ok(guides.box.width.endsWith('px'), '内联宽度应是像素值');
+  assert.equal(guides.branches.length, 2, '甲与乙各有子回复');
+  assert.ok(guides.branches[0].path.startsWith('M '), '分支应带路径');
+  assert.equal(guides.anchors.length, 4, '每条回复都要量到锚点');
+  assert.ok(guides.anchors[0].avatar, '锚点里应含头像矩形');
+});
+
+test('调试出口能给出关键计算样式', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  const { container, replies } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+
+  // 桩里没有真实排版，这里只验证取的是「插件写进去的那几个变量」
+  replies[0].style.setProperty('--echo-tree-depth', '0');
+  const css = globalThis.__echoTree.css(container);
+  assert.ok(css, '应返回样式快照');
+  assert.equal(css.container['--echo-tree-step'], '32px', '容器上应读到缩进步长');
+  assert.equal(css.reply['--echo-tree-depth'], '0', '回复上应读到层级变量');
 });
 
 test('缓存淘汰不会挤掉正在展示的楼层锚点', async () => {
