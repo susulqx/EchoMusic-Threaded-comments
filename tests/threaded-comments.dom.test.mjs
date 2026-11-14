@@ -985,7 +985,13 @@ test('红点落在名字行有效内容的最右侧，而不是整条回复的�
   const replyBox = wu.getBoundingClientRect();
   const dotX = Number.parseFloat(wu.style.getPropertyValue('--echo-tree-dot-x'));
 
-  assert.equal(dotX, Math.round((rowRight - replyBox.left + 2) * 100) / 100, '红点应紧跟这一行最右侧的内容');
+  // 间隙取宿主头行自己的 gap（CommentList.vue:1081 是 8px），
+  // 这样红点与徽章之间的距离和「名字与徽章」之间的一致
+  const gap = Number.parseFloat(
+    globalThis.getComputedStyle(header, null).getPropertyValue('column-gap'),
+  ) || 8;
+  assert.equal(dotX, Math.round((rowRight - replyBox.left + gap) * 100) / 100, '红点应紧跟这一行最右侧的内容');
+  assert.equal(gap, 8, '桩里的头行间距应与宿主一致，否则这条断言失去意义');
   assert.ok(dotX > 0, '红点坐标应为正数');
   assert.ok(
     Number.parseFloat(wu.style.getPropertyValue('--echo-tree-dot-y')) >= 0,
@@ -997,6 +1003,28 @@ test('红点落在名字行有效内容的最右侧，而不是整条回复的�
   for (const reply of replies) {
     assert.equal(reply.style.getPropertyValue('--echo-tree-dot-x'), '', '旧回复不点红点');
   }
+});
+
+test('红点与内容的间隙跟随宿主头行的 gap，而不是写死的数值', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  const { container, replies } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+
+  const [, wu] = await loadMore(container, moreBatch, replies);
+  const header = wu.querySelector('.comment-floor-reply-header');
+  const readDot = () => Number.parseFloat(wu.style.getPropertyValue('--echo-tree-dot-x'));
+  const rowRight = Math.max(...header.children.map((node) => node.getBoundingClientRect().right));
+  const left = wu.getBoundingClientRect().left;
+
+  const before = readDot();
+  assert.equal(before, Math.round((rowRight - left + 8) * 100) / 100, '默认取宿主的 8px');
+
+  // 宿主把间距调大（或换主题改了 gap），红点必须跟着退开，不能还贴 8px
+  header.__computed = { 'column-gap': '14px' };
+  await flush(container);
+  assert.equal(readDot(), Math.round((rowRight - left + 14) * 100) / 100, 'gap 变了红点跟着走');
 });
 
 test('名字行多出一个徽章后，红点跟着右移', async () => {

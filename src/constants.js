@@ -52,9 +52,6 @@ export const MIN_DIVIDER_WIDTH = 1;
 export const MAX_DIVIDER_WIDTH = 6;
 export const DIVIDER_WIDTH_STEP = 1;
 
-/** 红点离名字行内容右端的让位距离（尺寸本身写在 styles.css） */
-export const NEW_DOT_GAP = 2;
-
 /** 固定高度容器：像素范围与滑块步进 */
 export const MIN_CONTAINER_HEIGHT = 240;
 export const MAX_CONTAINER_HEIGHT = 960;

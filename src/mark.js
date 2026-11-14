@@ -5,14 +5,29 @@
  * 「回复某某」这类宽度随数据变化的节点，纯 CSS 只能贴到整条回复的右边缘，
  * 离内容常常隔着大半个屏。所以这里实际量一次，把坐标写进 CSS 变量。
  *
- * 只给坐标，不给尺寸：点的宽高、垂直居中、与内容的间隙全在 styles.css 里，
- * 改样子不用回来动这个文件。
+ * 只给坐标，不给尺寸：点的宽高与垂直居中在 styles.css 里。
+ * 与内容的间隙例外 —— 它取宿主头行自己的 gap，这样红点与徽章之间的
+ * 距离就和「名字与徽章」「徽章与徽章」之间的一模一样。
  */
 
-import { HEADER_CLASS, NEW_DOT_GAP } from "./constants.js";
+import { HEADER_CLASS } from "./constants.js";
 import { readReplies } from "./dom.js";
 
 const round = (value) => Math.round(value * 100) / 100;
+
+/** 头行量不到 gap 时的回落值，与宿主 CommentList.vue 的 .comment-floor-reply-header 一致 */
+const FALLBACK_GAP = 8;
+
+/**
+ * 头行的列间距。宿主的头像行是 flex + gap，红点要接在同一个节奏上。
+ * column-gap 的计算值是 "8px" 这类字符串，取不到数字就回落。
+ */
+const headerGap = (header) => {
+  if (typeof getComputedStyle !== "function") return FALLBACK_GAP;
+  const value = getComputedStyle(header, null).getPropertyValue("column-gap");
+  const gap = Number.parseFloat(value);
+  return Number.isFinite(gap) && gap >= 0 ? gap : FALLBACK_GAP;
+};
 
 /**
  * 量出头行里「同一行」内容的右边界与该行中线。
@@ -69,7 +84,7 @@ export const placeNewDots = (container) => {
     const left = box.left + element.clientLeft;
     const top = box.top + element.clientTop;
 
-    element.style.setProperty("--echo-tree-dot-x", round(row.right - left + NEW_DOT_GAP) + "px");
+    element.style.setProperty("--echo-tree-dot-x", round(row.right - left + headerGap(header)) + "px");
     element.style.setProperty("--echo-tree-dot-y", round(row.centerY - top) + "px");
   }
 };
