@@ -39,6 +39,7 @@ test("非法设置回落到默认值", () => {
     hideQuote: true,
     markNew: true,
     markDivider: true,
+    dividerWidth: 3,
   });
 });
 

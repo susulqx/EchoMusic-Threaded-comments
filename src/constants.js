@@ -41,7 +41,20 @@ export const DEFAULT_SETTINGS = {
   hideQuote: true,
   markNew: true,
   markDivider: true,
+  dividerWidth: 3,
 };
+
+/**
+ * 分界线粗细范围。
+ * 宿主的原生分割线是 1px，默认给 3px —— 它要在一堆 2px 引导线之间被一眼认出来。
+ */
+export const MIN_DIVIDER_WIDTH = 1;
+export const MAX_DIVIDER_WIDTH = 6;
+export const DIVIDER_WIDTH_STEP = 1;
+
+/** 红点尺寸与离内容右端的让位距离 */
+export const NEW_DOT_SIZE = 8;
+export const NEW_DOT_GAP = 2;
 
 /** 固定高度容器：像素范围与滑块步进 */
 export const MIN_CONTAINER_HEIGHT = 240;

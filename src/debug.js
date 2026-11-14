@@ -39,6 +39,11 @@ const STYLE_KEYS = [
   "--echo-tree-depth",
   "--echo-tree-line",
   "--echo-tree-node-bg",
+  "--echo-tree-divider-width",
+  "--echo-tree-dot-x",
+  "--echo-tree-dot-y",
+  "content",
+  "background-color",
 ];
 
 /** 读一个元素的关键计算样式；伪元素传 '::after' 之类 */

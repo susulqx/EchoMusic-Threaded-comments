@@ -55,6 +55,16 @@ const layoutContainer = (container) => {
     if (avatar) rects.set(avatar, rect(left + 16, top + 14, 30, 30));
     const footer = child.querySelector('.comment-floor-reply-footer');
     if (footer) rects.set(footer, rect(left + 58, top + 66, 120, 18));
+    // 名字行：昵称与徽章横向排开，红点要落在这一行最右侧那块内容之后
+    const header = child.querySelector('.comment-floor-reply-header');
+    if (header) {
+      let cursor = left + 58;
+      for (const node of header.children) {
+        const wide = matches(node, 'comment-floor-reply-name') ? 48 : 34;
+        rects.set(node, rect(cursor, top + 14, wide, 16));
+        cursor += wide + 8;
+      }
+    }
     top += ROW_HEIGHT;
   }
   rects.set(container, rect(0, 0, 800, top));
@@ -943,6 +953,87 @@ test('停用插件时清掉红点与分界线的全部标记', async () => {
   assert.equal(container.getAttribute('data-echo-mark-divider'), null);
   assert.equal(wu.getAttribute('data-echo-tree-new'), null);
   assert.equal(geng.getAttribute('data-echo-tree-new-root'), null);
+  // 红点坐标是量出来写在回复上的，标记撤掉时必须一起撤
+  assert.equal(wu.style.getPropertyValue('--echo-tree-dot-x'), '');
+  assert.equal(wu.style.getPropertyValue('--echo-tree-dot-y'), '');
+  assert.equal(container.style.getPropertyValue('--echo-tree-divider-width'), '');
+});
+
+test('红点落在名字行有效内容的最右侧，而不是整条回复的右边缘', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  const { container, replies } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+
+  // 给乙（甲的子回复）加一个 VIP 徽章：红点必须让到徽章之后，而不是昵称之后
+  const yi = replies[1];
+  const badge = new El('span');
+  badge.className = 'comment-badge comment-badge-floor';
+  yi.querySelector('.comment-floor-reply-header').appendChild(badge);
+
+  const [geng, wu] = await loadMore(container, moreBatch, replies);
+  assert.equal(wu.getAttribute('data-echo-tree-depth'), '1', '戊挂在乙下面');
+
+  const header = wu.querySelector('.comment-floor-reply-header');
+  const rowRight = Math.max(
+    ...header.children.map((node) => {
+      const box = node.getBoundingClientRect();
+      return box.width > 0 ? box.right : 0;
+    }),
+  );
+  const replyBox = wu.getBoundingClientRect();
+  const dotX = Number.parseFloat(wu.style.getPropertyValue('--echo-tree-dot-x'));
+
+  assert.equal(dotX, Math.round((rowRight - replyBox.left + 2) * 100) / 100, '红点应紧跟这一行最右侧的内容');
+  assert.ok(dotX > 0, '红点坐标应为正数');
+  assert.ok(
+    Number.parseFloat(wu.style.getPropertyValue('--echo-tree-dot-y')) >= 0,
+    '红点纵坐标应落在名字行上',
+  );
+
+  // 一级回复由分界线表达，不该有红点坐标
+  assert.equal(geng.style.getPropertyValue('--echo-tree-dot-x'), '', '一级回复不点红点');
+  for (const reply of replies) {
+    assert.equal(reply.style.getPropertyValue('--echo-tree-dot-x'), '', '旧回复不点红点');
+  }
+});
+
+test('名字行多出一个徽章后，红点跟着右移', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  const { container, replies } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+
+  const [, wu] = await loadMore(container, moreBatch, replies);
+  const before = Number.parseFloat(wu.style.getPropertyValue('--echo-tree-dot-x'));
+  assert.ok(before > 0, '先要有坐标');
+
+  // 宿主的徽章是异步补上的（VIP、勋章），宽进来之后红点必须重算
+  const badge = new El('span');
+  badge.className = 'comment-badge comment-badge-floor';
+  wu.querySelector('.comment-floor-reply-header').appendChild(badge);
+  await flush(container);
+
+  const after = Number.parseFloat(wu.style.getPropertyValue('--echo-tree-dot-x'));
+  assert.ok(after > before, '徽章进来后红点应右移：' + before + ' -> ' + after);
+});
+
+test('分界线粗细写进容器变量，关掉开关后撤除', async () => {
+  reset();
+  store.set('threaded-comments:settings', { enabled: true, markDivider: true, dividerWidth: 5 });
+  await mod.activate(makeCtx());
+  const { container } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+  assert.equal(container.style.getPropertyValue('--echo-tree-divider-width'), '5px');
+
+  store.set('threaded-comments:settings', { enabled: true, markDivider: false, dividerWidth: 5 });
+  mod.deactivate();
+  await mod.activate(makeCtx());
+  await flush(container);
+  assert.equal(container.style.getPropertyValue('--echo-tree-divider-width'), '', '关掉分界线就不写线宽');
 });
 
 // ---------- P3：调试出口 window.__echoTree ----------

@@ -42,10 +42,13 @@ export const MESSAGES = {
     "settings.hideQuote.desc": "树状缩进后父评论就在上方，不再重复展示被回复评论的正文。",
 
     "settings.markNew.label": "新加载的子回复显示红点",
-    "settings.markNew.desc": "点击「加载更多」后，这次新来的二级及以下回复头像角上标一个红点。",
+    "settings.markNew.desc": "点击「加载更多」后，这次新来的二级及以下回复在名字那一行右侧标一个红点。",
 
     "settings.markDivider.label": "新加载的回复前加分界线",
-    "settings.markDivider.desc": "这条新加载的一级回复与旧回复之间画一条灰色横线，区分批次。",
+    "settings.markDivider.desc": "这条新加载的一级回复与旧回复之间画一条带 NEW 字样的灰色横线，区分批次。",
+
+    "settings.dividerWidth.label": "分界线粗细",
+    "settings.dividerWidth.desc": "{min}–{max} 像素，默认 3 像素。",
 
     "settings.paginate.label": "楼层内分页",
     "settings.paginate.desc": "每个根回复及其子回复算一页，每页 {perPage} 个根回复；末页可继续加载。",

@@ -8,8 +8,11 @@
 
 import {
   CONTAINER_HEIGHT_STEP,
+  DIVIDER_WIDTH_STEP,
   MAX_CONTAINER_HEIGHT,
+  MAX_DIVIDER_WIDTH,
   MIN_CONTAINER_HEIGHT,
+  MIN_DIVIDER_WIDTH,
   MODES,
   ROOTS_PER_PAGE,
   STORAGE_KEY,
@@ -124,6 +127,25 @@ export const createSettingsComponent = (ctx) =>
             ? switchField("markDivider", settings.value.markDivider, (value) => ({
                 markDivider: value,
               }))
+            : null,
+
+          settings.value.enabled && settings.value.markDivider
+            ? field(
+                t("settings.dividerWidth.label"),
+                t("settings.dividerWidth.desc", {
+                  min: MIN_DIVIDER_WIDTH,
+                  max: MAX_DIVIDER_WIDTH,
+                }),
+                h(Slider, {
+                  modelValue: settings.value.dividerWidth,
+                  min: MIN_DIVIDER_WIDTH,
+                  max: MAX_DIVIDER_WIDTH,
+                  step: DIVIDER_WIDTH_STEP,
+                  showValue: true,
+                  valueSuffix: "px",
+                  "onUpdate:modelValue": (value) => patch({ dividerWidth: Number(value) }),
+                }),
+              )
             : null,
 
           settings.value.enabled

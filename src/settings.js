@@ -6,7 +6,9 @@ import {
   DEFAULT_CONTAINER_HEIGHT,
   DEFAULT_SETTINGS,
   MAX_CONTAINER_HEIGHT,
+  MAX_DIVIDER_WIDTH,
   MIN_CONTAINER_HEIGHT,
+  MIN_DIVIDER_WIDTH,
   MODES,
   STORAGE_KEY,
 } from "./constants.js";
@@ -29,6 +31,11 @@ export function normalizeSettings(raw) {
     markNew: source.markNew === undefined ? DEFAULT_SETTINGS.markNew : Boolean(source.markNew),
     markDivider:
       source.markDivider === undefined ? DEFAULT_SETTINGS.markDivider : Boolean(source.markDivider),
+    dividerWidth: clamp(
+      Math.round(toFiniteNumber(source.dividerWidth, DEFAULT_SETTINGS.dividerWidth)),
+      MIN_DIVIDER_WIDTH,
+      MAX_DIVIDER_WIDTH,
+    ),
   };
 }
 

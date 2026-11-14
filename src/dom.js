@@ -76,10 +76,14 @@ export const clearContainerMarks = (container, releaseProtection) => {
   for (const attr of CONTAINER_ATTRS) container.removeAttribute(attr);
   container.style.removeProperty("--echo-tree-container-height");
   container.style.removeProperty("--echo-tree-step");
+  container.style.removeProperty("--echo-tree-divider-width");
 
   for (const element of readReplies(container)) {
     for (const attr of REPLY_ATTRS) element.removeAttribute(attr);
     element.style.removeProperty("--echo-tree-depth");
+    // 红点坐标是量出来写在回复上的，标记撤掉时必须一起撤，否则下次复用会歪
+    element.style.removeProperty("--echo-tree-dot-x");
+    element.style.removeProperty("--echo-tree-dot-y");
   }
 
   clearGuides(container);

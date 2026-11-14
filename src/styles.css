@@ -130,25 +130,24 @@
 }
 
 /*
- * 新加载出来的「二级及以下」回复：整条回复右上角一个红点。
+ * 新加载出来的「二级及以下」回复：名字那一行的有效内容右侧一个红点。
  *
  * 为什么要标：重排会把新加载的子回复插到它所属的旧父评论下面，
  * 位置跟着变了，肉眼很难看出哪几条才是这次新来的。
  *
  * 位置刻意避开头像：头像上可能有徽章、悬停菜单等宿主自己的角标，
  * 也可能被用户点开主页，压一个圆点过去既挡内容又会误导。
- * 圆点绝对定位在回复自身的右上角，不参与布局，也不吃点击
- * （pointer-events: none），宿主的交互区一点不受影响。
+ *
+ * 为什么坐标由 JS 现量（--echo-tree-dot-x / -y）而不是写死 right：
+ * 名字行里还有 VIP 徽章、「回复某某」这类宽度随数据变化的节点，
+ * 纯 CSS 只能贴到整条回复的右边缘，离内容很远。JS 量出这一行
+ * 最右侧的有效内容再写进变量，点就正好落在内容后面。
  */
-.comment-floor-inline > .comment-floor-reply[data-echo-tree-new][data-echo-tree] {
-  position: relative;
-}
-
 .comment-floor-inline > .comment-floor-reply[data-echo-tree-new][data-echo-tree]::after {
   content: "";
   position: absolute;
-  top: 8px;
-  right: 4px;
+  left: var(--echo-tree-dot-x, 0);
+  top: var(--echo-tree-dot-y, 8px);
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -162,11 +161,39 @@
  * 用 border-top 而不是伪元素：相邻回复之间的 border-top 已被上面那条规则
  * 抹掉了（相邻回复 border-top: none），这里正好把这条单独补回来，
  * 既是一条真灰线，也不占额外高度、不会把引导线的锚点挤歪。
+ * 粗细由设置里调，写在容器变量上，这里只管读。
  */
 .comment-floor-inline
   > .comment-floor-reply[data-echo-tree]
   + .comment-floor-reply[data-echo-tree-new-root][data-echo-tree] {
-  border-top: 1px solid var(--border-light, #dedede);
+  border-top: var(--echo-tree-divider-width, 3px) solid var(--border-light, #dedede);
+}
+
+/*
+ * 分界线正中的 NEW 字样。
+ *
+ * border 里塞不进文字，所以用一个绝对定位的伪元素压在线上，
+ * 横向 -50% 居中、纵向再上移半个线宽，中心正好落在线上。
+ * 底色取主面板色把线盖住，同 --echo-tree-node-bg 的理由：
+ * 楼层容器是主面板色叠 5% 色调，差异肉眼看不出，盖得住线就够了。
+ */
+.comment-floor-inline
+  > .comment-floor-reply[data-echo-tree]
+  + .comment-floor-reply[data-echo-tree-new-root][data-echo-tree]::before {
+  content: "NEW";
+  position: absolute;
+  left: 50%;
+  /* 包含块是 padding box，top: 0 在边框内侧；上移半个线宽才压到线的正中 */
+  top: calc(var(--echo-tree-divider-width, 3px) / -2);
+  transform: translateY(-50%);
+  padding: 0 6px;
+  background: var(--surface-main-base, Canvas);
+  color: var(--text-secondary, #9499a0);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.6;
+  letter-spacing: 0.06em;
+  pointer-events: none;
 }
 
 /*

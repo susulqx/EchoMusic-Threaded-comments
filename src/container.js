@@ -12,6 +12,7 @@
  */
 
 import { MAX_COLLAPSED_KEYS, ROOTS_PER_PAGE } from "./constants.js";
+import { placeNewDots } from "./mark.js";
 import { clearContainerMarks, readReplies, readReplyKey } from "./dom.js";
 import { resolveClick } from "./interactions.js";
 import {
@@ -78,6 +79,13 @@ const applyContainerAttrs = (container, settings) => {
   } else {
     container.removeAttribute("data-echo-container");
     container.style.removeProperty("--echo-tree-container-height");
+  }
+
+  // 分界线粗细：写在容器上，逐条规则只管读
+  if (settings.markDivider) {
+    container.style.setProperty("--echo-tree-divider-width", settings.dividerWidth + "px");
+  } else {
+    container.style.removeProperty("--echo-tree-divider-width");
   }
 };
 
@@ -248,6 +256,8 @@ export const applyContainer = (container) => {
   }
 
   markNewRoots(rows, settings);
+  // 红点坐标要等节点位置定下来再量：上面刚写完缩进与显隐，这里量到的才是最终位置
+  placeNewDots(container);
 
   syncGuides(container, rows, settings);
   syncPager(container, state, settings, pageById ? state.pageCount : 1);
