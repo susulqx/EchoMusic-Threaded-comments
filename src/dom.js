@@ -62,6 +62,7 @@ const CONTAINER_ATTRS = [
   "data-echo-thread",
   "data-echo-mode",
   "data-echo-container",
+  "data-echo-quote-off",
 ];
 
 /**

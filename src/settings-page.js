@@ -113,6 +113,10 @@ export const createSettingsComponent = (ctx) =>
             : null,
 
           settings.value.enabled
+            ? switchField("hideQuote", settings.value.hideQuote, (value) => ({ hideQuote: value }))
+            : null,
+
+          settings.value.enabled
             ? field(
                 t("settings.paginate.label"),
                 t("settings.paginate.desc", { perPage: ROOTS_PER_PAGE }),

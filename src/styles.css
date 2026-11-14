@@ -129,6 +129,14 @@
   display: none !important;
 }
 
+/*
+ * 回复下方那个引用块复述的是被回复评论的正文，树状缩进之后父评论就在上方，
+ * 再复述一遍既重复又打断层级感。所以默认收起来。
+ */
+.comment-floor-inline[data-echo-quote-off="on"] .comment-floor-quote {
+  display: none !important;
+}
+
 .comment-floor-inline[data-echo-container="on"] {
   max-height: var(--echo-tree-container-height, 480px);
   overflow-y: auto;

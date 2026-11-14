@@ -57,6 +57,7 @@ test("压缩后的产物仍能激活，且注入的样式与源文件结构一�
     "[data-echo-tree-hidden]",
     'data-echo-mode="lineCollapseMain"',
     'data-echo-container="on"',
+    'data-echo-quote-off="on"',
     ".echo-tree-pager-btn",
     ".echo-tree-guides",
     ".echo-tree-branch-node",

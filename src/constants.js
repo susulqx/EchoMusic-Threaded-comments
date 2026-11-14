@@ -10,6 +10,7 @@
  *   回复头   .comment-floor-reply-header    折叠按钮插在它的末尾
  *   加载更多 .comment-floor-more > .comment-floor-more-btn
  *   主评论   .comment-item > .comment-avatar 容器在 .comment-main 里，主评论头像在它的兄弟列
+ *   引用块   .comment-floor-quote          回复下方复述被回复评论正文的那一段
  */
 
 export const STORAGE_KEY = "threaded-comments:settings";
@@ -37,6 +38,7 @@ export const DEFAULT_SETTINGS = {
   container: false,
   containerHeight: 480,
   paginate: false,
+  hideQuote: true,
 };
 
 /** 固定高度容器：像素范围与滑块步进 */

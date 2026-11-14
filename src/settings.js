@@ -25,6 +25,7 @@ export function normalizeSettings(raw) {
     container: Boolean(source.container),
     containerHeight: clampHeight(height),
     paginate: Boolean(source.paginate),
+    hideQuote: source.hideQuote === undefined ? DEFAULT_SETTINGS.hideQuote : Boolean(source.hideQuote),
   };
 }
 

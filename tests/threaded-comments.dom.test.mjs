@@ -295,6 +295,11 @@ const makeReply = (name, time) => {
   timeEl.textContent = time + ' · 广东';
   footer.appendChild(timeEl);
   body.appendChild(footer);
+  // 宿主会在回复正文下方复述被回复评论；插件按设置隐藏它
+  const quote = new El('blockquote');
+  quote.className = 'comment-floor-quote';
+  quote.textContent = '被回复的正文';
+  body.appendChild(quote);
   reply.appendChild(body);
   return reply;
 };
@@ -356,6 +361,8 @@ test('容器按关系缩进，兄弟不共享子树', async () => {
 
   assert.equal(container.getAttribute('data-echo-thread'), 'on');
   assert.equal(container.getAttribute('data-echo-mode'), 'lineKeepMain');
+  // 引用块默认隐藏：宿主那句复述在树状缩进后与父评论重复
+  assert.equal(container.getAttribute('data-echo-quote-off'), 'on');
   assert.equal(container.style.getPropertyValue('--echo-tree-step'), '32px');
 
   const depths = replies.map((reply) => reply.getAttribute('data-echo-tree-depth'));
@@ -749,6 +756,30 @@ test('关闭分页后分页条消失、全部根可见', async () => {
   await flush(container);
   assert.equal(container.querySelector('.echo-tree-pager'), null);
   assert.equal(replies[0].getAttribute('data-echo-tree-hidden'), null);
+});
+
+test('隐藏引用默认开启，关掉开关后容器标记撤除', async () => {
+  reset();
+  store.set('threaded-comments:settings', { enabled: true, hideQuote: false });
+  await mod.activate(makeCtx());
+  const { container } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+  assert.equal(container.getAttribute('data-echo-quote-off'), null, '关掉开关就不写标记');
+});
+
+test('停用插件时撤掉引用标记，宿主原有引用块复原', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  const { container, replies } = buildFloor();
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({ status: 200, body: floorBody() }));
+  await flush(container);
+  assert.equal(container.getAttribute('data-echo-quote-off'), 'on');
+  // 插件只写标记，不改 quote 节点：节点仍在，由 CSS 决定是否显示
+  assert.ok(replies[0].querySelector('.comment-floor-quote'), '引用节点由宿主保留');
+
+  mod.deactivate();
+  assert.equal(container.getAttribute('data-echo-quote-off'), null);
 });
 
 test('缓存淘汰不会挤掉正在展示的楼层锚点', async () => {

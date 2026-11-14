@@ -10,6 +10,6 @@
     "serverIntercept": true
   },
   "requires": {
-    "echoMusicVersion": ">=2.3.3-beta.1"
+    "echoMusicVersion": ">=2.3.2"
   }
 }

@@ -14,7 +14,7 @@ test("manifest 只声明 serverIntercept，并给出宿主版本下限", () => {
   assert.equal(manifest.id, "threaded-comments");
   assert.equal(manifest.main, "index.js");
   assert.deepEqual(Object.keys(manifest.capabilities), ["serverIntercept"]);
-  assert.match(manifest.requires.echoMusicVersion, /2\.3\.3-beta\.1/);
+  assert.match(manifest.requires.echoMusicVersion, /2\.3\.2/);
 });
 
 test("容器高度被夹到 240–960", () => {
@@ -29,13 +29,21 @@ test("非法设置回落到默认值", () => {
   assert.equal(settings.enabled, true);
   assert.equal(settings.container, false);
   assert.equal(settings.paginate, false);
+  assert.equal(settings.hideQuote, true);
   assert.deepEqual(api.normalizeSettings(null), {
     enabled: true,
     mode: "lineKeepMain",
     container: false,
     containerHeight: 480,
     paginate: false,
+    hideQuote: true,
   });
+});
+
+test("隐藏引用默认开启，显式关闭时保留 false", () => {
+  assert.equal(api.normalizeSettings({}).hideQuote, true);
+  assert.equal(api.normalizeSettings({ hideQuote: false }).hideQuote, false);
+  assert.equal(api.normalizeSettings({ hideQuote: 0 }).hideQuote, false);
 });
 
 test("线性回复链得到递增深度，且父先子后", () => {

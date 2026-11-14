@@ -68,6 +68,10 @@ const applyContainerAttrs = (container, settings) => {
   container.setAttribute("data-echo-thread", "on");
   container.setAttribute("data-echo-mode", settings.mode);
 
+  // 回复下方的引用块由 CSS 隐藏，插件不动节点本身
+  if (settings.hideQuote) container.setAttribute("data-echo-quote-off", "on");
+  else container.removeAttribute("data-echo-quote-off");
+
   if (settings.container) {
     container.setAttribute("data-echo-container", "on");
     container.style.setProperty("--echo-tree-container-height", settings.containerHeight + "px");

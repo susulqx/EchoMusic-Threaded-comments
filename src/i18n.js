@@ -38,6 +38,9 @@ export const MESSAGES = {
     "settings.mode.hint.lineKeepMain": "折叠时保留父评论正文，只隐藏它下面的回复。",
     "settings.mode.hint.indentOnly": "只做缩进，不显示引导线与折叠按钮。",
 
+    "settings.hideQuote.label": "隐藏回复下方的引用",
+    "settings.hideQuote.desc": "树状缩进后父评论就在上方，不再重复展示被回复评论的正文。",
+
     "settings.paginate.label": "楼层内分页",
     "settings.paginate.desc": "每个根回复及其子回复算一页，每页 {perPage} 个根回复；末页可继续加载。",
 
