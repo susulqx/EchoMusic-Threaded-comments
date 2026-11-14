@@ -1,7 +1,8 @@
 /**
  * 宿主 DOM 的读取与标记清理。
  *
- * 约定：插件只写 data-echo-* 属性与 CSS 自定义属性，不移动、不重排宿主的节点。
+ * 约定：插件只写 data-echo-* 属性与 CSS 自定义属性，不改宿主的节点内容。
+ * 唯一会动的节点顺序由 order.js 负责（子回复紧跟父评论），清理时按原始次序插回。
  * 所有选择器集中在这里与 constants.js 的注释里，宿主改版时只需改这两处。
  */
 
@@ -14,6 +15,7 @@ import {
   TIME_CLASS,
 } from "./constants.js";
 import { clearGuides } from "./guides.js";
+import { restoreReplies } from "./order.js";
 import { resolveMetaKey } from "./tree.js";
 import { directChild } from "./util.js";
 
@@ -78,6 +80,8 @@ export const clearContainerMarks = (container, releaseProtection) => {
   }
 
   clearGuides(container);
+  // 排序是本插件干的，撤掉标记的同时把宿主的原始次序还回去
+  restoreReplies(container);
 
   const pager = directChild(container, "echo-tree-pager");
   if (pager) pager.remove();

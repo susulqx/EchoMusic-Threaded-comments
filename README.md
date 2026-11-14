@@ -30,8 +30,9 @@ EchoMusic 插件。把歌曲 / 专辑 / 歌单评论里的楼层回复，按回�
 ## 实现说明
 
 - 回复的父子关系来自插件对 `/comment/*` 响应的旁路观察（manifest 声明 `serverIntercept`），不改写请求与响应。
-- DOM 侧只用 `data-echo-*` 属性与 CSS 自定义属性标注层级；缩进由 `padding-inline-start` 完成，引导线由插件自建的 SVG 图层绘制，**不移动、不重排宿主的任何节点**，因此不会与 Vue 的 keyed 更新冲突。
-- 楼层回复与其接口数据的对齐键是「昵称 + 时间」；对齐失败时该条保持原有平铺位置，不会错挂到别的分支下。
+- 宿主把回复按接口返回顺序平铺（A B C D），树序要求子回复紧跟父评论（A D B C）。**排序真的移动 DOM 节点**（`src/order.js`），而不是只改视觉顺序：跨条拖选与复制走的是 DOM 顺序，视觉与 DOM 不一致时会复制出乱序文本。宿主是 `:key` 的 keyed list，只保证复用不保证顺序，它下次 patch 把顺序拨回自己的口径时，容器的 MutationObserver 会再拨一次；停用或关闭时按「首次见到的顺序」插回原位。
+- 楼层回复与其接口数据的对齐键是「昵称 + 时间」；对齐失败时该条保持原有相对位置排在末尾，不会错挂到别的分支下。
+- 缩进由 `padding-inline-start` 完成，引导线由插件自建的 SVG 图层绘制；除回复节点的先后次序外不移动、不改写宿主节点的内容。
 - 折叠状态按「昵称 + 时间」记录而非索引，宿主追加新回复后原有折叠不会错位。
 - 关系缓存有上限，且正在展示的楼层会被保护，不会被后续大量请求挤掉。
 - 插件禁用或卸载时，所有属性、注入的按钮与监听器都会被移除。
@@ -48,7 +49,7 @@ node build.mjs --watch      # 改 src/ 后自动重建
 
 依赖零成本：不引入 esbuild / rollup / 任何 npm 包，`build.mjs` 只做本项目用到的语法子集（静态相对 import、具名 export、export default）。
 
-压缩策略是**只删注释与空白，不重命名任何标识符**：产物里 `buildThreadTree`、`data-echo-tree-depth` 这类名字原样保留，线上排查照样能搜；同时不做任何会改变运行时的变换，性能与未压缩版一致（约 62 KB → 41 KB）。
+压缩策略是**只删注释与空白，不重命名任何标识符**：产物里 `buildThreadTree`、`data-echo-tree-depth` 这类名字原样保留，线上排查照样能搜；同时不做任何会改变运行时的变换，性能与未压缩版一致（约 66 KB → 43 KB）。
 
 | 模块 | 职责 |
 | --- | --- |
@@ -59,6 +60,7 @@ node build.mjs --watch      # 改 src/ 后自动重建
 | `src/settings.js` | 设置规整与读取 |
 | `src/meta-cache.js` | `/comment/*` 响应 → 「昵称 + 时间」→ pid 的关系缓存 |
 | `src/runtime.js` | 共享的响应式设置状态 |
+| `src/order.js` | 按树序重排回复节点，停用时按原始次序还原 |
 | `src/dom.js` | 宿主 DOM 读取与痕迹清理 |
 | `src/guides.js` | SVG 引导线图层：分支路径、折叠节点、命中区 |
 | `src/pager.js` | 楼层内分页条 |
@@ -79,7 +81,7 @@ node --test tests/threaded-comments.test.mjs tests/threaded-comments.dom.test.mj
 ```
 
 - `threaded-comments.test.mjs`：纯函数（设置归一化、树构建断环 / 深度上限 / 同级排序、对齐键、缩进步长）+ 文案与产物自包含。
-- `threaded-comments.dom.test.mjs`：用最小 DOM 桩驱动完整链路 —— 拦截器采集关系 → 楼层打标 → 折叠 → 分页切页 → 加载更多后保持折叠 → 关闭与卸载清理。
+- `threaded-comments.dom.test.mjs`：用最小 DOM 桩驱动完整链路 —— 拦截器采集关系 → 楼层打标 → 子回复排到父评论下方 → 折叠 → 分页切页 → 加载更多后保持折叠 → 关闭与卸载清理与顺序还原。
 - `build.test.mjs`：对**打包产物**跑一次真实 `activate`，校验注入的 CSS 结构完整、导出与拦截器契约不变、压缩未重命名标识符。
 
 ## 兼容性

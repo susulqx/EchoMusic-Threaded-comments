@@ -7,7 +7,8 @@
  *   2. 容器内部 MutationObserver（宿主追加「加载更多」的回复、Vue 更新文本）
  *   3. 用户点击折叠按钮 / 分页按钮
  *
- * 重算只写属性，不动节点顺序 —— 宿主的 keyed list 因此不会被打乱。
+ * 重算做两件事：把回复按「父先子后」重排成真 DOM 顺序，再逐条写层级属性。
+ * 排序是真的移动节点 —— 只改视觉顺序时跨条拖选与复制会按 DOM 顺序跳过子回复。
  */
 
 import { MAX_COLLAPSED_KEYS, ROOTS_PER_PAGE } from "./constants.js";
@@ -20,6 +21,7 @@ import {
   releaseProtection,
 } from "./meta-cache.js";
 import { syncGuides } from "./guides.js";
+import { rememberOrder, syncReplyOrder } from "./order.js";
 import { syncPager } from "./pager.js";
 import { getSettings } from "./runtime.js";
 import { buildThreadTree, computeIndentStep, paginateTree } from "./tree.js";
@@ -131,14 +133,31 @@ export const applyContainer = (container) => {
   }
 
   const replies = readReplies(container);
+  // 先记下宿主的原始次序，停用时按它插回去
+  rememberOrder(container, replies);
   applyContainerAttrs(container, settings);
 
-  const keys = replies.map(readReplyKey);
+  const keyByElement = new Map();
+  const keys = replies.map((element) => {
+    const key = readReplyKey(element);
+    keyByElement.set(element, key);
+    return key;
+  });
   protectKeys(container, keys);
 
   const { items, keyCount } = collectItems(keys);
   const tree = buildThreadTree(items);
   const nodeById = new Map(tree.map((node) => [node.id, node]));
+
+  // 对齐键唯一的回复才有资格排序；对不上的留在原地，不猜位置
+  const elementByKey = new Map();
+  for (const [element, key] of keyByElement) {
+    if (key && keyCount.get(key) === 1) elementByKey.set(key, element);
+  }
+  const ordered = syncReplyOrder(
+    container,
+    tree.map((node) => elementByKey.get(node.id)).filter(Boolean),
+  );
 
   const maxDepth = tree.reduce((acc, node) => Math.max(acc, node.depth), 0);
   const step = computeIndentStep(container.clientWidth, maxDepth);
@@ -148,17 +167,17 @@ export const applyContainer = (container) => {
   const hiddenById = computeHidden(tree, state, pageById);
 
   const rows = [];
-  replies.forEach((element, index) => {
-    const key = keys[index];
+  for (const element of ordered) {
+    const key = keyByElement.get(element);
     // 同一楼层内同名同秒无法区分谁是谁，整组按根级平铺，不猜挂载
-    const node = key && keyCount.get(key) === 1 ? nodeById.get(key) : undefined;
+    const node = key ? nodeById.get(key) : undefined;
     const depth = node ? node.depth : 0;
     const hidden = Boolean(node && hiddenById.get(node.id) === true);
     const collapsed = Boolean(node && state.collapsed.has(node.id));
 
     applyReply(element, depth, hidden, collapsed);
     // 隐藏的行不参与画线：它们没有可量的矩形，Guide 只认可见的锚点
-    if (!node || hidden) return;
+    if (!node || hidden) continue;
     rows.push({
       element,
       key,
@@ -167,7 +186,7 @@ export const applyContainer = (container) => {
       hasChildren: node.hasChildren,
       collapsed,
     });
-  });
+  }
 
   syncGuides(container, rows, settings);
   syncPager(container, state, settings, pageById ? state.pageCount : 1);

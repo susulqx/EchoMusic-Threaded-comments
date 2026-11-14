@@ -118,7 +118,22 @@ class El {
     const rect = measureRect(this);
     return rect || { left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 };
   }
-  appendChild(child) { child.parent = this; this.children.push(child); return child; }
+  // 真实 DOM 的 appendChild / insertBefore 都是「移动」语义：先把节点从原位置摘掉，
+  // 桩若只是 push 会产生同一节点出现两次的假象，排序相关的断言就废了。
+  detach(child) {
+    if (child.parent) {
+      const i = child.parent.children.indexOf(child);
+      if (i >= 0) child.parent.children.splice(i, 1);
+    }
+    const j = this.children.indexOf(child);
+    if (j >= 0) this.children.splice(j, 1);
+  }
+  appendChild(child) {
+    this.detach(child);
+    child.parent = this;
+    this.children.push(child);
+    return child;
+  }
   removeChild(child) {
     const i = this.children.indexOf(child);
     if (i >= 0) this.children.splice(i, 1);
@@ -126,6 +141,7 @@ class El {
     return child;
   }
   insertBefore(child, ref) {
+    this.detach(child);
     const index = ref ? this.children.indexOf(ref) : -1;
     child.parent = this;
     if (index < 0) this.children.push(child);
@@ -340,6 +356,12 @@ test('容器按关系缩进，兄弟不共享子树', async () => {
 /** 分支组的 data-echo-tree-key 即「昵称\0时间」 */
 const keyOf = (name, time) => name + '\u0000' + time;
 
+/** 容器里回复节点的实际 DOM 顺序，按昵称读，便于直接对照期望 */
+const replyOrder = (container) =>
+  Array.from(container.children)
+    .filter((child) => child.classList.contains('comment-floor-reply'))
+    .map((child) => child.querySelector('.comment-floor-reply-name').textContent);
+
 const branchKeys = (container) =>
   container.querySelectorAll('.echo-tree-branch').map((group) => group.getAttribute('data-echo-tree-key'));
 
@@ -368,6 +390,43 @@ test('折叠父级隐藏子孙但保留兄弟', async () => {
   container.dispatch('click', { target: branchOf(container, '乙', '2025-01-01 10:01:00'), preventDefault() {}, stopPropagation() {} });
   await tick();
   assert.equal(replies[2].getAttribute('data-echo-tree-hidden'), null);
+});
+
+test('子回复紧跟父评论：ABCD 且 D 是 A 的回复 → ADCB', async () => {
+  reset();
+  await mod.activate(makeCtx());
+  // 宿主按接口顺序平铺：A B C D，D 挂在 A 下
+  const container = new El('div');
+  container.className = 'comment-floor-inline';
+  const replies = [
+    makeReply('A', '2025-01-01 10:00:00'),
+    makeReply('B', '2025-01-01 10:01:00'),
+    makeReply('C', '2025-01-01 10:02:00'),
+    makeReply('D', '2025-01-01 10:03:00'),
+  ];
+  for (const reply of replies) container.appendChild(reply);
+  await interceptors[0].handler({ method: 'GET', url: '/comment/floor' }, async () => ({
+    status: 200,
+    body: {
+      status: 1,
+      list: [
+        { comment_id: '1', pid: '0', user_name: 'A', addtime: '2025-01-01 10:00:00' },
+        { comment_id: '2', pid: '0', user_name: 'B', addtime: '2025-01-01 10:01:00' },
+        { comment_id: '3', pid: '0', user_name: 'C', addtime: '2025-01-01 10:02:00' },
+        { comment_id: '4', pid: '1', user_name: 'D', addtime: '2025-01-01 10:03:00' },
+      ],
+    },
+  }));
+  await flush(container);
+
+  assert.deepEqual(replyOrder(container), ['A', 'D', 'B', 'C'], '真实 DOM 顺序也必须是父先子后');
+  // DOM 顺序变了，层级标注不能跟着错乱：D 在 A 之下占第二格
+  const depthInDom = () => Array.from(container.children)
+    .filter((child) => child.classList.contains('comment-floor-reply'))
+    .map((child) => child.querySelector('.comment-floor-reply-name').textContent + ':' + child.getAttribute('data-echo-tree-depth'));
+  assert.deepEqual(depthInDom(), ['A:0', 'D:1', 'B:0', 'C:0']);
+  mod.deactivate();
+  assert.deepEqual(replyOrder(container), ['A', 'B', 'C', 'D'], '停用后还原宿主的原始次序');
 });
 
 test('无法对齐的回复保持根级平铺，不误挂', async () => {
